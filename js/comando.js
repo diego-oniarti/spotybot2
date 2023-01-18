@@ -1,5 +1,5 @@
 class Comando{
-    constructor(data, execute, aliases, executeMsg, example, description, parameters){
+    constructor({data, execute, aliases, executeMsg, example, description, parameters}={}){
         if (!data || !execute || !aliases || !executeMsg || !example || !description){
             throw new Error("Comando invalido");
         }

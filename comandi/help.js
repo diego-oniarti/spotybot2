@@ -46,8 +46,8 @@ const esegui= async (comando)=>{
     }
 }
 
-module.exports = new Comando(
-	new SlashCommandBuilder()
+module.exports = new Comando({
+	data: new SlashCommandBuilder()
 		.setName('help')
 		.setDescription('Helps you with the bot or with specific commands')
         .setDescriptionLocalizations({
@@ -71,16 +71,16 @@ module.exports = new Comando(
             return option;
         }),
 
-	async(interaction) => {
+	execute: async(interaction) => {
         const comando = interaction.options.getString("command");
 
         const reply = await esegui(comando);
         return await interaction.reply(reply);
 	},
 
-    ['help'],
+    aliases: ['help'],
 
-    async (messaggio, args) => {
+    executeMsg: async (messaggio, args) => {
         const comando = args[0];
         if (comando && !comandi.includes(comando))
             return await messaggio.channel.send({
@@ -95,7 +95,7 @@ module.exports = new Comando(
         return await messaggio.channel.send(reply);
     },
 
-    '`-help` `[command]`',
-    'Helps you with the bot or with specific commands',
-    '`command`: the command you need help with'
-);
+    example: '`-help` `[command]`',
+    description: 'Helps you with the bot or with specific commands',
+    parameters: '`command`: the command you need help with'
+});

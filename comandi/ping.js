@@ -17,25 +17,25 @@ const comando=()=>{
 	}
 }
 
-module.exports = new Comando(
-	new SlashCommandBuilder()
+module.exports = new Comando({
+	data: new SlashCommandBuilder()
 		.setName('ping')
 		.setDescription('Replies with Pong!')
         .setDescriptionLocalizations({
             it: 'Risponde con Pong!'
         }),
-	async (interaction) => {
+	execute: async (interaction) => {
 		const reply = comando();
 		return await interaction.reply(reply);
 	},
 
-	['ping'],
+	aliases: ['ping'],
 
-	async (message) => {
+	executeMsg: async (message) => {
 		const reply = comando();
 		message.channel.send(reply);
 	},
 
-	'`-ping`',
-	'Replies with Pong!'
-);
+	example: '`-ping`',
+	description: 'Replies with Pong!'
+});

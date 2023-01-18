@@ -16,8 +16,8 @@ const esegui= async (messaggio, delay)=>{
     }
 }
 
-module.exports = new Comando(
-	new SlashCommandBuilder()
+module.exports = new Comando({
+	data: new SlashCommandBuilder()
 		.setName('echo')
 		.setDescription('Repeats what you say after a delay')
         .setDescriptionLocalizations({
@@ -49,7 +49,7 @@ module.exports = new Comando(
             .setMaxValue(5000)
             .setRequired(false)
     ),
-	async(interaction) => {
+	execute: async(interaction) => {
         const message = interaction.options.getString("message");
         const delay = interaction.options.getInteger("delay") || 0;
 
@@ -58,9 +58,9 @@ module.exports = new Comando(
         return await interaction.editReply(reply);
 	},
 
-    ['echo'],
+    aliases: ['echo'],
 
-    async (messaggio, args) => {
+    executeMsg: async (messaggio, args) => {
         const message = args[0];
         const delay = args[1] || 0;
 
@@ -78,7 +78,7 @@ module.exports = new Comando(
         return await messaggio.channel.send(reply);
     },
 
-    '`-echo` `message` `[delay]`',
-    'Repeats what you say after a delay\nThe delay is specified in milliseconds',
-    '`message`: The message the bot will send back to you\n`[delay]`: The amount of time (ms) that the bot will wait before replying. If omitted this value is 0'
-);
+    example: '`-echo` `message` `[delay]`',
+    description:  'Repeats what you say after a delay\nThe delay is specified in milliseconds',
+    parameters: '`message`: The message the bot will send back to you\n`[delay]`: The amount of time (ms) that the bot will wait before replying. If omitted this value is 0'
+});

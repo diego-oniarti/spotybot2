@@ -39,8 +39,8 @@ const comando = (song,position,  member)=>{
     };
 }
 
-module.exports = new Comando(
-	new SlashCommandBuilder()
+module.exports = new Comando({
+	data: new SlashCommandBuilder()
 		.setName('play')
 		.setDescription('Plays a song or adds it to the queue')
         .setDescriptionLocalizations({
@@ -71,7 +71,7 @@ module.exports = new Comando(
             .setMinValue(0)
             .setRequired(false)
         ),
-	async (interaction) => {
+	execute: async (interaction) => {
         const song = interaction.options.getString("song");
         const position = interaction.options.getInteger("position") || 0;
 
@@ -82,8 +82,8 @@ module.exports = new Comando(
 	},
 
 
-    ['play', 'p'],
-    async (message,args)=>{
+    aliases: ['play', 'p'],
+    executeMsg: async (message,args)=>{
         const canzone = args[0];
         const posizione = args[1];
 
@@ -91,7 +91,14 @@ module.exports = new Comando(
             return 
     },
 
-    '`-play` `song`\n-play `song` `[postition]`',
-    'Plays a song or adds it to the queue.',
-    '`song`: the title or the link of the song/playlist you want to be played (supports both YouTube and Spotify)\n`[position]: The position in the queue where to insert the song. If not specified, the song will be inserted at the end of the queue`'
-);
+    example: '`-play` `song`\n-play `song` `[postition]`',
+    description: 'Plays a song or adds it to the queue.',
+    parameters: '`song`: the title or the link of the song/playlist you want to be played (supports both YouTube and Spotify)\n`[position]: The position in the queue where to insert the song. If not specified, the song will be inserted at the end of the queue`'
+});
+
+class a {
+    constructor ({a= 0 ,b= 1}={}){
+        this.a = a;
+        this.b=b;
+    }
+}
