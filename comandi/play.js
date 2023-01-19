@@ -3,17 +3,101 @@ const Discord = require('@discordjs/voice');
 const ytdl = require('ytdl-core');
 const Comando = require('../js/comando');
 const { Colori } = require('../js/colori');
+const fs = require('node:fs')
+const path = require('node:path')
 
-const comando = (song,position,  member)=>{
+
+const trovaCanzoneYT = async (videoId)=>{
+
+}
+
+const trovaCanzone = async (song)=>{
+    if (song.match(/^https\:\/\/www\.youtube\.com\/watch\?v=.{11}$/)){
+        const videoId = song.match(/^https\:\/\/www\.youtube\.com\/watch\?v=(?<videoId>.{11})$/).groups.videoId;
+        return await trovaCanzoneYT(videoId);
+    }
+}
+
+const saluta = async (connection)=>{
+    const saluti = fs.readdirSync(path.join(__dirname,'..','saluti')).map(file=>path.join(__dirname,'..','saluti',file));
+
+    const saluto = Discord.createAudioResource(saluti[Math.floor(Math.random()*saluti.length)]);
+    const player = Discord.createAudioPlayer();
+    player.play(saluto);
+    connection.subscribe(player);
     
+    let finisci;
+    let finito = new Promise((res)=>{
+        finisci = res;
+    });
+
+    player.on(Discord.AudioPlayerStatus.Idle, ()=>{
+        finisci();
+    })
+
+    await finito;
+}
+
+
+
+const comando = async (song,position, member)=>{
+    if (!member.voice)
+        return {
+            embeds: [
+                new EmbedBuilder()
+                .setTitle('Errore!')
+                .setDescription("Where are you?\nI can't see you :eyes:")
+                .setColor(Colori.error)
+            ]
+        }
+
+    const guild = member.guild;
+
+    let  song;
+    try {
+        song = await trovaCanzone(song);
+    }catch(error){
+        switch (error.message){
+            case '':
+                return {
+                    embeds: [
+                        /* ... */
+                    ]
+                }
+                break;
+        }
+    }
     
-    const canzone = new canzone;
-    
-    
-    
-    const stream = ytdl('https://www.youtube.com/watch?v=DgJSltMGfXg', {filter:'audioonly'});
+
+    const voiceChannel = member.voice.channel;
+
+    let connection = Discord.getVoiceConnection(guild.id)
+    if (!connection){
+        connection = Discord.joinVoiceChannel({
+            channelId: voiceChannel.id,
+            guildId: guild.id,
+            adapterCreator: guild.voiceAdapterCreator
+        });
+        await saluta(connection);
+    }
+
+
+
+
+    return {
+        embeds: [
+            new EmbedBuilder()
+            .setTitle('OK!')
+            .setColor(Colori.default)
+        ]
+    };
+
+    const canzone = trovaCanzone(song);
+
+
+
+/*    const stream = ytdl('https://www.youtube.com/watch?v=DgJSltMGfXg', {filter:'audioonly'});
         
-    const channel = member.voice.channel;
     const player = Discord.createAudioPlayer();
     const resource = Discord.createAudioResource(stream);
 
@@ -37,6 +121,7 @@ const comando = (song,position,  member)=>{
             .setColor(Colori.default)
         ]
     };
+    */
 }
 
 module.exports = new Comando({
@@ -75,7 +160,7 @@ module.exports = new Comando({
         const song = interaction.options.getString("song");
         const position = interaction.options.getInteger("position") || 0;
 
-        const response = comando(song, position, interaction.member)
+        const response = await comando(song, position, interaction.member)
         response.ephemeral = true;
 
         return await interaction.reply(response);
@@ -86,9 +171,10 @@ module.exports = new Comando({
     executeMsg: async (message,args)=>{
         const canzone = args[0];
         const posizione = args[1];
+        const response = await comando(canzone, posizione, interaction.member)
 
         if (!canzone)
-            return 
+            return await message.channel.reply(response);
     },
 
     example: '`-play` `song`\n-play `song` `[postition]`',
