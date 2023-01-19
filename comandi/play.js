@@ -3,19 +3,78 @@ const Discord = require('@discordjs/voice');
 const ytdl = require('ytdl-core');
 const Comando = require('../js/comando');
 const { Colori } = require('../js/colori');
-const fs = require('node:fs')
-const path = require('node:path')
+const fs = require('node:fs');
+const path = require('node:path');
+const fetch = require('node-fetch');
+const colori = require('../js/colori');
+require('dotenv').config();
+const {servers} = require('../index');
+const { Server } = require('../js/server');
 
+const youtubeKey = process.env.YOUTUBE_KEY;
+const errors = {
+    YouTubeVideoNotFound: 0,
+    youTubeKeyExpired: 1
+}
 
-const trovaCanzoneYT = async (videoId)=>{
+console.log(servers)
+
+/*questi metodi devono ritornare una lista di oggetti Canzone*/
+/* conzone: {link, titolo, file} */
+
+const ricercaTitolo = async (song)=>{
 
 }
 
-const trovaCanzone = async (song)=>{
-    if (song.match(/^https\:\/\/www\.youtube\.com\/watch\?v=.{11}$/)){
-        const videoId = song.match(/^https\:\/\/www\.youtube\.com\/watch\?v=(?<videoId>.{11})$/).groups.videoId;
+const trovaLinkSpotify = async(id, resource)=>{
+
+}
+
+const trovaListaYT = async (videoId, listId)=>{
+
+}
+
+const trovaCanzoneYT = async (videoId)=>{
+    const res = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${videoId}&key=${youtubeKey}`);
+
+    if (res.ok){
+        const snippet = await res.json();
+        const item = snippet.items[0];
+        if (!item){
+            throw new Error(errors.YouTubeVideoNotFound);
+        }
+        return [
+            {
+                link: `https://www.youtube.com/watch?v=${item.id}`,
+                titolo: item.snippet.title,
+                file: false
+            }
+        ];
+    }else{
+        throw new Error(errors.youTubeKeyExpired);
+    }
+}
+
+const trovaCanzoni = async (song)=>{
+    if (song.match(/^https:\/\/youtu\.be\/.{11}$|^https:\/\/www\.youtube\.com\/watch\?v=.{11}$/)){
+        const match = song.match(/^https:\/\/youtu\.be\/(?<videoId>.{11})$|^https:\/\/www\.youtube\.com\/watch\?v=(?<videoId2>.{11})$/);
+        const videoId = match.groups.videoId || match.groups.videoId2;
         return await trovaCanzoneYT(videoId);
     }
+    // https://www.youtube.com/watch?v=QN1odfjtMoo&list=PLG7bQTXLuEouQFSnPUY6mFuJRf7ULbZbo
+    if (song.match(/^https:\/\/www\.youtube\.com\/watch\?v=.{11}&list=.*$/)){
+        const match = song.match(/^https:\/\/www\.youtube\.com\/watch\?v=(?<videoId>.{11})&list=(?<listId>.*)$/);
+        const videoId = match.groups.videoId || match.groups.videoId2;
+        const listId = match.groups.videoId || match.groups.videoId2;
+        return await trovaListaYT(videoId, listId);
+    }
+    if (song.match(/^https:\/\/open\.spotify\.com\/(track|album|artist|playlist)\/.{22}/)){
+        const match = song.match(/https:\/\/open\.spotify\.com\/(?<resource>track|album|artist|playlist)\/(?<id>.{22})/).groups.id;
+        const id =  match.id;
+        const resource = match.resource;
+        return await trovaLinkSpotify(id, resource);
+    }
+    return await ricercaTitolo(song);
 }
 
 const saluta = async (connection)=>{
@@ -38,40 +97,65 @@ const saluta = async (connection)=>{
     await finito;
 }
 
-
-
 const comando = async (song,position, member)=>{
+    // controlla che l'utente sia in un canale vocale visibile 
     if (!member.voice)
         return {
             embeds: [
                 new EmbedBuilder()
-                .setTitle('Errore!')
+                .setTitle('Error!')
                 .setDescription("Where are you?\nI can't see you :eyes:")
                 .setColor(Colori.error)
             ]
         }
 
     const guild = member.guild;
+    const voiceChannel = member.voice.channel;
 
-    let  song;
+    let connection = Discord.getVoiceConnection(guild.id)
+    // se il bot è già in un altro canale vocale rispondi con errore
+    if (voiceChannel && (connection.channel.id != voiceChannel.id))
+        return {
+            embeds: [
+                new EmbedBuilder()
+                .setTitle('Error!')
+                .setDescription("I'm already in another voice channel")
+                .setColor(colori.error)
+            ]
+        }
+
+
+    // cerca la canzone (o le canzoni) e ritorna un messaggio d'errore se non si trova nulla
+    let canzoni;
     try {
-        song = await trovaCanzone(song);
+        canzoni = await trovaCanzoni(song);
     }catch(error){
         switch (error.message){
-            case '':
+            case errors.YouTubeVideoNotFound:
                 return {
                     embeds: [
-                        /* ... */
+                        new EmbedBuilder()
+                        .setTitle('Error!')
+                        .setDescription("The link you've provided doesn't seem to bring anywhere :o")
+                        .setColor(colori.error)
+                    ]
+                }
+                break;
+            case errors.youTubeKeyExpired:
+                return {
+                    embeds: [
+                        new EmbedBuilder()
+                        .setTitle('Error!')
+                        .setDescription('We ran out of youtube quotas ¯\_(:P)_/¯')
+                        .setColor(colori.error)
                     ]
                 }
                 break;
         }
     }
-    
 
-    const voiceChannel = member.voice.channel;
 
-    let connection = Discord.getVoiceConnection(guild.id)
+    // se il bot non è in un canale vocale, entra e saluta
     if (!connection){
         connection = Discord.joinVoiceChannel({
             channelId: voiceChannel.id,
@@ -81,8 +165,13 @@ const comando = async (song,position, member)=>{
         await saluta(connection);
     }
 
+    if (!servers.has(guild.id))
+        servers.set(guild.id, new Server(guild));
+    const server = servers.get(guild.id);
+    
+    server.queue = [...server.queue.slice(0,position), ...canzoni, ...server.queue.slice(position)];
 
-
+    // todo: bisogna controllare se il bot sta già suonando qualcosa o se è il primo play
 
     return {
         embeds: [
@@ -91,8 +180,6 @@ const comando = async (song,position, member)=>{
             .setColor(Colori.default)
         ]
     };
-
-    const canzone = trovaCanzone(song);
 
 
 

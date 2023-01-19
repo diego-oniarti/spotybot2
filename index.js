@@ -4,7 +4,6 @@ const path = require('node:path');
 const { Server } = require('./js/server');
 const { Client, Events, GatewayIntentBits, EmbedBuilder } = require('discord.js');
 const { Colori } = require('./js/colori');
-const comandi = require('./js/comandi');
 
 require('dotenv').config();
 
@@ -23,6 +22,8 @@ client.once(Events.ClientReady, c => {
 });
 
 const servers = new Map();
+module.exports.servers = {servers};
+const comandi = require('./js/comandi');
 
 // importo dei comandi
 client.commands = comandi;
