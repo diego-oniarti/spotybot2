@@ -12,6 +12,7 @@ class Server {
         this.mode = Modes.linear;
         this.radioTrack1=undefined;
         this.radioTrack2=undefined;
+        this.isPlaying=false;
     }
 }
 

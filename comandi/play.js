@@ -17,10 +17,51 @@ const errors = {
     youTubeKeyExpired: 1
 }
 
-console.log(servers)
-
 /*questi metodi devono ritornare una lista di oggetti Canzone*/
 /* conzone: {link, titolo, file} */
+
+
+
+const fineCanzone = (server)=>{
+    return ()=>{
+        if (server.queue.length>0)
+            suona(server);
+        else{
+            server.isPlaying=false;
+            const connection = Discord.getVoiceConnection(server.guild.id);
+            connection.destroy();
+        }
+    }
+}
+const erroreCanzone = (server)=>{
+    return ()=>{
+        server.isPlaying = false;
+        connection.destroy();
+    }
+    
+}
+
+
+const suona = (server) => {
+    let connection = Discord.getVoiceConnection(server.guild.id);
+
+    const canzone = server.queue.shift();
+    const stream = ytdl(canzone.link, {filter:'audioonly'});
+    const player = Discord.createAudioPlayer();
+    const resource = Discord.createAudioResource(stream);
+
+    player.play(resource);
+    connection.subscribe(player);
+    server.isPlaying=true;
+
+    player.on(Discord.AudioPlayerStatus.Idle,
+        fineCanzone(server)
+    );
+    player.on(Discord.AudioPlayerError,
+        erroreCanzone(server)
+    );
+}
+
 
 const ricercaTitolo = async (song)=>{
 
@@ -43,6 +84,7 @@ const trovaCanzoneYT = async (videoId)=>{
         if (!item){
             throw new Error(errors.YouTubeVideoNotFound);
         }
+        console.log(item.snippet.title)
         return [
             {
                 link: `https://www.youtube.com/watch?v=${item.id}`,
@@ -99,7 +141,7 @@ const saluta = async (connection)=>{
 
 const comando = async (song,position, member)=>{
     // controlla che l'utente sia in un canale vocale visibile 
-    if (!member.voice)
+    if (!member.voice.channel)
         return {
             embeds: [
                 new EmbedBuilder()
@@ -114,7 +156,7 @@ const comando = async (song,position, member)=>{
 
     let connection = Discord.getVoiceConnection(guild.id)
     // se il bot è già in un altro canale vocale rispondi con errore
-    if (voiceChannel && (connection.channel.id != voiceChannel.id))
+    if (connection && (connection.joinConfig.channelId != voiceChannel.id))
         return {
             embeds: [
                 new EmbedBuilder()
@@ -169,46 +211,31 @@ const comando = async (song,position, member)=>{
         servers.set(guild.id, new Server(guild));
     const server = servers.get(guild.id);
     
-    server.queue = [...server.queue.slice(0,position), ...canzoni, ...server.queue.slice(position)];
+    const posizione = (!position || position==-1)? server.queue.length : Math.min(Math.max(position,0), server.queue.length);
+    server.queue = [...server.queue.slice(0,posizione), ...canzoni, ...server.queue.slice(posizione)];
 
-    // todo: bisogna controllare se il bot sta già suonando qualcosa o se è il primo play
+    // se il server non sta suonando nulla, inizia a suonare, altrimenti accoda e basta
+    if (!server.isPlaying){
+        suona(server);
+    }
 
-    return {
-        embeds: [
-            new EmbedBuilder()
-            .setTitle('OK!')
-            .setColor(Colori.default)
-        ]
-    };
-
-
-
-/*    const stream = ytdl('https://www.youtube.com/watch?v=DgJSltMGfXg', {filter:'audioonly'});
-        
-    const player = Discord.createAudioPlayer();
-    const resource = Discord.createAudioResource(stream);
-
-    const connection = Discord.joinVoiceChannel({
-        channelId: channel.id,
-        guildId: member.guild.id,
-        adapterCreator: member.guild.voiceAdapterCreator
-    });
-
-    player.play(resource);
-    connection.subscribe(player);
-
-    player.on(Discord.AudioPlayerStatus.Idle, ()=>{
-        connection.destroy();
-    });
-
-    return {
-        embeds: [
-            new EmbedBuilder()
-            .setTitle('OK!')
-            .setColor(Colori.default)
-        ]
-    };
-    */
+    if (canzoni.length == 1)
+        return {
+            embeds: [
+                new EmbedBuilder()
+                .setTitle(`Queued at position ${posizione+1}`)
+                .setDescription(`__[${canzoni[0].titolo}](${canzoni[0].link})__`)
+                .setColor(Colori.default)
+            ]
+        };
+    else
+        return {
+            embeds: [
+                new EmbedBuilder()
+                .setTitle(`Queued ${canzoni.length} songs from position ${posizione+1}`)
+                .setColor(Colori.default)
+            ]
+        };
 }
 
 module.exports = new Comando({
@@ -240,17 +267,17 @@ module.exports = new Comando({
             .setDescriptionLocalizations({
                 it: "Posizione in coda dove inserire la canzone"
             })
-            .setMinValue(0)
+            .setMinValue(1)
             .setRequired(false)
         ),
 	execute: async (interaction) => {
         const song = interaction.options.getString("song");
-        const position = interaction.options.getInteger("position") || 0;
+        const position = interaction.options.getInteger("position")-1;
 
-        const response = await comando(song, position, interaction.member)
+        const response = await comando(song, position, interaction.member);
         response.ephemeral = true;
-
-        return await interaction.reply(response);
+        await interaction.deferReply({ephemeral:false});
+        return await interaction.editReply(response);
 	},
 
 
@@ -258,20 +285,17 @@ module.exports = new Comando({
     executeMsg: async (message,args)=>{
         const canzone = args[0];
         const posizione = args[1];
-        const response = await comando(canzone, posizione, interaction.member)
 
         if (!canzone)
-            return await message.channel.reply(response);
+            return message.channel.send({embeds:[new EmbedBuilder().setTitle('Error!').setDescription("No song specified.\nUse the `help` command to know more").setColor(colori.error)]});
+        if (isNaN(parseInt(posizione)))
+            return message.channel.send({embeds:[new EmbedBuilder().setTitle('Error!').setDescription("No song specified.\nUse the `help` command to know more").setColor(colori.error)]});
+
+        const response = await comando(canzone, posizione-1, message.member)
+        return await message.send(response);
     },
 
     example: '`-play` `song`\n-play `song` `[postition]`',
     description: 'Plays a song or adds it to the queue.',
     parameters: '`song`: the title or the link of the song/playlist you want to be played (supports both YouTube and Spotify)\n`[position]: The position in the queue where to insert the song. If not specified, the song will be inserted at the end of the queue`'
 });
-
-class a {
-    constructor ({a= 0 ,b= 1}={}){
-        this.a = a;
-        this.b=b;
-    }
-}

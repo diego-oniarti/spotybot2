@@ -22,7 +22,7 @@ client.once(Events.ClientReady, c => {
 });
 
 const servers = new Map();
-module.exports.servers = {servers};
+module.exports = {servers: servers};
 const comandi = require('./js/comandi');
 
 // importo dei comandi
@@ -41,6 +41,7 @@ const errorMsg = {
 // gestione degli Slash Commands
 client.on(Events.InteractionCreate, async interaction => {
     if (!interaction.isChatInputCommand()) return;
+	console.log(servers);
     const command = client.commands.get(interaction.commandName);
 
 	if (!command) {
