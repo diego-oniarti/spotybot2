@@ -14,19 +14,37 @@ const { Server } = require('../js/server');
 const youtubeKey = process.env.YOUTUBE_KEY;
 const errors = {
     YouTubeVideoNotFound: 0,
-    youTubeKeyExpired: 1
+    youTubeKeyExpired: 1,
+    YouTubePlaylistNotFound: 2
+}
+
+let spotifyToken;
+
+const getSpotifyToken = async ()=>{
+    const client_id = process.env.SPOTIFY_CLIENT_ID;
+    const client_secret = process.env.SPOTIFY_CLIENT_SECRET;
+
+    const res = await fetch('https://accounts.spotify.com/api/token', {
+        method: 'POST',
+        headers: {
+            'Authorization': 'Basic ' + (new Buffer.from(client_id + ':' + client_secret).toString('base64'))
+        },
+        body: params,
+    });
+    const data = await res.json();
+
+    spotifyToken = data.access_token;
+    return data.access_token;
 }
 
 /*questi metodi devono ritornare una lista di oggetti Canzone*/
-/* conzone: {link, titolo, file} */
-
-
-
+/* canzone: {link, titolo, file} */
 const fineCanzone = (server)=>{
     return ()=>{
-        if (server.queue.length>0)
+        server.audioResource = null;
+        if (server.queue.length>0){
             suona(server);
-        else{
+        } else {
             server.isPlaying=false;
             const connection = Discord.getVoiceConnection(server.guild.id);
             connection.destroy();
@@ -34,11 +52,12 @@ const fineCanzone = (server)=>{
     }
 }
 const erroreCanzone = (server)=>{
-    return ()=>{
+    server.audioResource = undefined;
+    return (error)=>{
+        console.error(error);
         server.isPlaying = false;
         connection.destroy();
     }
-    
 }
 
 
@@ -50,6 +69,8 @@ const suona = (server) => {
     const player = Discord.createAudioPlayer();
     const resource = Discord.createAudioResource(stream);
 
+    server.audioResource = resource;
+
     player.play(resource);
     connection.subscribe(player);
     server.isPlaying=true;
@@ -57,7 +78,7 @@ const suona = (server) => {
     player.on(Discord.AudioPlayerStatus.Idle,
         fineCanzone(server)
     );
-    player.on(Discord.AudioPlayerError,
+    player.on('error',
         erroreCanzone(server)
     );
 }
@@ -68,11 +89,42 @@ const ricercaTitolo = async (song)=>{
 }
 
 const trovaLinkSpotify = async(id, resource)=>{
-
+    
 }
 
 const trovaListaYT = async (videoId, listId)=>{
+    const ret = [];
+    let pageToken;
+    do {
+        var hasNextPage = false;
+        const res = await fetch(`https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&maxResults=5${pageToken?`&pageToken=${pageToken}`:''}&playlistId=${listId}&key=${youtubeKey}`);
 
+        if (res.ok){
+            const snippet = await res.json();
+
+            if (snippet.nextPageToken){
+                pageToken = snippet.nextPageToken;
+                hasNextPage=true;
+            }
+
+            const items = snippet.items;
+            if (!items){
+                throw new Error(errors.YouTubePlaylistNotFound);
+            }
+            ret.push(...items.map(item=>{
+                console.log(item.snippet.title);
+                console.log(item.snippet.resourceId.videoId);
+                return {
+                    link: `https://www.youtube.com/watch?v=${item.snippet.resourceId.videoId}`,
+                    titolo: item.snippet.title,
+                    file: false
+                }
+            }));
+        }else{
+            throw new Error(errors.youTubeKeyExpired);
+        }
+    }while(hasNextPage);
+    return ret;
 }
 
 const trovaCanzoneYT = async (videoId)=>{
@@ -106,8 +158,8 @@ const trovaCanzoni = async (song)=>{
     // https://www.youtube.com/watch?v=QN1odfjtMoo&list=PLG7bQTXLuEouQFSnPUY6mFuJRf7ULbZbo
     if (song.match(/^https:\/\/www\.youtube\.com\/watch\?v=.{11}&list=.*$/)){
         const match = song.match(/^https:\/\/www\.youtube\.com\/watch\?v=(?<videoId>.{11})&list=(?<listId>.*)$/);
-        const videoId = match.groups.videoId || match.groups.videoId2;
-        const listId = match.groups.videoId || match.groups.videoId2;
+        const videoId = match.groups.videoId;
+        const listId = match.groups.listId;
         return await trovaListaYT(videoId, listId);
     }
     if (song.match(/^https:\/\/open\.spotify\.com\/(track|album|artist|playlist)\/.{22}/)){
@@ -193,6 +245,16 @@ const comando = async (song,position, member)=>{
                     ]
                 }
                 break;
+            case errors.YouTubePlaylistNotFound:
+                return {
+                    embeds: [
+                        new EmbedBuilder()
+                        .setTitle('Error!')
+                        .setDescription("The link you've provided doesn't seem to bring anywhere :o")
+                        .setColor(colori.error)
+                    ]
+                }
+                break;
         }
     }
 
@@ -274,9 +336,10 @@ module.exports = new Comando({
         const song = interaction.options.getString("song");
         const position = interaction.options.getInteger("position")-1;
 
+        await interaction.deferReply({ephemeral:false});
+
         const response = await comando(song, position, interaction.member);
         response.ephemeral = true;
-        await interaction.deferReply({ephemeral:false});
         return await interaction.editReply(response);
 	},
 
