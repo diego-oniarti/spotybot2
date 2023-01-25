@@ -6,16 +6,19 @@ const { Colori } = require('../js/colori');
 const fs = require('node:fs');
 const path = require('node:path');
 const fetch = require('node-fetch');
-const colori = require('../js/colori');
 require('dotenv').config();
-const {servers} = require('../index');
+const { servers } = require('../shared');
 const { Server } = require('../js/server');
+
+const play = require('play-dl')
 
 const youtubeKey = process.env.YOUTUBE_KEY;
 const errors = {
     YouTubeVideoNotFound: 0,
     youTubeKeyExpired: 1,
-    YouTubePlaylistNotFound: 2
+    YouTubePlaylistNotFound: 2,
+    YouTubeTitleNotFound: 3,
+    SpotifyIdNotFound: 4
 }
 
 let spotifyToken;
@@ -23,6 +26,9 @@ let spotifyToken;
 const getSpotifyToken = async ()=>{
     const client_id = process.env.SPOTIFY_CLIENT_ID;
     const client_secret = process.env.SPOTIFY_CLIENT_SECRET;
+
+    const params = new URLSearchParams();
+    params.append('grant_type', 'client_credentials');
 
     const res = await fetch('https://accounts.spotify.com/api/token', {
         method: 'POST',
@@ -37,59 +43,223 @@ const getSpotifyToken = async ()=>{
     return data.access_token;
 }
 
-/*questi metodi devono ritornare una lista di oggetti Canzone*/
-/* canzone: {link, titolo, file} */
-const fineCanzone = (server)=>{
+const fineCanzone = (server,channel)=>{
     return ()=>{
+        server.pastSongs.push(server.corrente);
         server.audioResource = null;
         if (server.queue.length>0){
-            suona(server);
+            suona(server,channel);
         } else {
             server.isPlaying=false;
+            server.audioResource = undefined;
             const connection = Discord.getVoiceConnection(server.guild.id);
-            connection.destroy();
+            if (connection)
+                connection.destroy();
         }
     }
 }
-const erroreCanzone = (server)=>{
-    server.audioResource = undefined;
+const erroreCanzone = (server,channel)=>{
     return (error)=>{
         console.error(error);
-        server.isPlaying = false;
-        connection.destroy();
+        return fineCanzone(server,channel);
     }
 }
 
-
-const suona = (server) => {
+const suona = async (server, channel) => {
     let connection = Discord.getVoiceConnection(server.guild.id);
 
     const canzone = server.queue.shift();
-    const stream = ytdl(canzone.link, {filter:'audioonly'});
+    server.corrente = canzone;
+
+    //const stream = ytdl(canzone.link, {filter:'audioonly'});
+    const stream = await play.stream(canzone.link);
+
     const player = Discord.createAudioPlayer();
-    const resource = Discord.createAudioResource(stream);
+    const resource = Discord.createAudioResource(stream.stream, {
+        inputType: stream.type
+    });
 
     server.audioResource = resource;
 
     player.play(resource);
     connection.subscribe(player);
     server.isPlaying=true;
+    try{
+        channel.send({
+            embeds: [
+                new EmbedBuilder()
+                .setTitle('Now Playing')
+                .setDescription(`__[${canzone.titolo}](${canzone.link})__`)
+                .setColor(Colori.default)
+            ]
+        });
+    } catch (error) {
+        console.error(error);
+    }
 
     player.on(Discord.AudioPlayerStatus.Idle,
-        fineCanzone(server)
+        fineCanzone(server,channel)
     );
     player.on('error',
-        erroreCanzone(server)
+        erroreCanzone(server,channel)
     );
 }
 
+/*questi metodi devono ritornare una canzone o lista di oggetti Canzone*/
+/* canzone: {link, titolo, file} */
 
 const ricercaTitolo = async (song)=>{
-
+    let pagina = await fetch(encodeURI(`https://www.youtube.com/results?search_query=${song}`))
+    try{
+        var html = await pagina.text();
+    }catch(error){
+        console.error(error);
+        throw errors.YouTubeTitleNotFound;
+    }
+    token = html.match(/\"videoId\"\:\"(.{1,12})\"/)[1];
+    if (!token)
+        throw errors.YouTubeTitleNotFound;
+    return trovaCanzoneYT(token);
 }
 
-const trovaLinkSpotify = async(id, resource)=>{
+
+const parseSpotify = async(res)=>{
+    if (res.status == 400 && res.error.status=='invalid id'){
+        throw errors.SpotifyIdNotFound;
+    }
+    if (res.error) {
+        console.log(res.error);
+        throw res.error;
+    }
+    return await res.json();
+}
+
+
+const trackToTitle = (track)=>{
+    const ricerca = [track.name];
+    for (let artista of track.artists){
+        ricerca.push(artista.name)
+    }
+
+    return ricerca.join(' ');
+}
+
+const spotifyTrack = async (id)=>{
+    const res = await fetch(`https://api.spotify.com/v1/tracks/${id}`,{
+        headers: {
+            'Authorization': `Bearer ${spotifyToken}`
+        }
+    });
+    if (res.status == 401 && res.error.message=='The access token expired'){
+        getSpotifyToken();
+        return (spotifyTrack(id));
+    }
+    const data = await parseSpotify(res);
+
+    return trackToTitle(data);
+}
+
+const spotifyAlbum = async (id)=>{
+    const iteraLink = async (link)=>{
+        const res = await fetch(link,{
+            headers: {
+                'Authorization': `Bearer ${spotifyToken}`
+            }
+        });
+        if (res.status == 401 && res.error.message=='The access token expired'){
+            getSpotifyToken();
+            return (iteraLink(link));
+        }
+        const data = await parseSpotify(res);
     
+        const titoli = [];
+        for (let track of data.items){
+            titoli.push(trackToTitle(track));
+        }
+        if (data.next){
+            titoli.push(... (await (iteraLink(next) )));
+        }
+
+        return titoli;
+    }
+
+    return await iteraLink(`https://api.spotify.com/v1/albums/${id}/tracks?limit=50`);
+}
+
+const spotifyArtist = async (id) =>{
+    const res = await fetch(`https://api.spotify.com/v1/artists/${id}/top-tracks?market=IT`,{
+        headers: {
+            'Authorization': `Bearer ${spotifyToken}`
+        }
+    });
+    if (res.status == 401 && res.error.message=='The access token expired'){
+        getSpotifyToken();
+        return (spotifyArtist(id));
+    }
+    const data = await parseSpotify(res);
+
+    const titoli = [];
+    for (let track of data.tracks){
+        titoli.push(trackToTitle(track));
+    }
+
+    return titoli;
+}
+
+const spotifyPlaylist = async (id) =>{
+    const iteraLink = async (link)=>{
+        const res = await fetch(link,{
+            headers: {
+                'Authorization': `Bearer ${spotifyToken}`
+            }
+        });
+        if (res.status == 401 && res.error.message=='The access token expired'){
+            getSpotifyToken();
+            return (iteraLink(link));
+        }
+        const data = await parseSpotify(res);
+    
+        const titoli = [];
+        for (let item of data.items){
+            titoli.push(trackToTitle(item.track));
+        }
+        if (data.next){
+            titoli.push(... (await (iteraLink(next) )));
+        }
+
+        return titoli;
+    }
+
+    return await iteraLink(`https://api.spotify.com/v1/playlists/${id}/tracks?limit=50&market=IT`);
+}
+
+
+const trovaLinkSpotify = async(id, resource)=>{
+    const titoli = [];
+    if (!spotifyToken){
+        await getSpotifyToken();
+    }
+
+    switch (resource){
+        case 'track':
+            titoli.push(await spotifyTrack(id));
+            break;
+        case 'album':
+            titoli.push(... (await ( spotifyAlbum(id))));
+            break;
+        case 'artist':
+            titoli.push(... (await ( spotifyArtist(id))));
+            break;
+        case 'playlist':
+            titoli.push(... (await ( spotifyPlaylist(id))));
+            break;
+    }
+
+    const canzoni = await Promise.all(
+        titoli.map(titolo=>ricercaTitolo(titolo))
+    );
+
+    return canzoni;
 }
 
 const trovaListaYT = async (videoId, listId)=>{
@@ -112,8 +282,6 @@ const trovaListaYT = async (videoId, listId)=>{
                 throw new Error(errors.YouTubePlaylistNotFound);
             }
             ret.push(...items.map(item=>{
-                console.log(item.snippet.title);
-                console.log(item.snippet.resourceId.videoId);
                 return {
                     link: `https://www.youtube.com/watch?v=${item.snippet.resourceId.videoId}`,
                     titolo: item.snippet.title,
@@ -137,38 +305,38 @@ const trovaCanzoneYT = async (videoId)=>{
             throw new Error(errors.YouTubeVideoNotFound);
         }
         console.log(item.snippet.title)
-        return [
-            {
-                link: `https://www.youtube.com/watch?v=${item.id}`,
-                titolo: item.snippet.title,
-                file: false
-            }
-        ];
+        return {
+            link: `https://www.youtube.com/watch?v=${item.id}`,
+            titolo: item.snippet.title,
+            file: false
+        };
     }else{
         throw new Error(errors.youTubeKeyExpired);
     }
 }
 
+//deve ritornare un lista di canzoni
 const trovaCanzoni = async (song)=>{
     if (song.match(/^https:\/\/youtu\.be\/.{11}$|^https:\/\/www\.youtube\.com\/watch\?v=.{11}$/)){
         const match = song.match(/^https:\/\/youtu\.be\/(?<videoId>.{11})$|^https:\/\/www\.youtube\.com\/watch\?v=(?<videoId2>.{11})$/);
         const videoId = match.groups.videoId || match.groups.videoId2;
-        return await trovaCanzoneYT(videoId);
+        return [await trovaCanzoneYT(videoId)];
     }
     // https://www.youtube.com/watch?v=QN1odfjtMoo&list=PLG7bQTXLuEouQFSnPUY6mFuJRf7ULbZbo
-    if (song.match(/^https:\/\/www\.youtube\.com\/watch\?v=.{11}&list=.*$/)){
-        const match = song.match(/^https:\/\/www\.youtube\.com\/watch\?v=(?<videoId>.{11})&list=(?<listId>.*)$/);
+    // https://youtube.com/playlist?list=PLvwkDL8hMpWr2hyMgQwj9wHQINqwpTqWc
+    if (song.match(/^https:\/\/www\.youtube\.com\/watch\?v=.{11}&list=.*$|^https:\/\/youtube.com\/playlist\?list=.{34}$/)){
+        const match = song.match(/^https:\/\/www\.youtube\.com\/watch\?v=(?<videoId>.{11})&list=(?<listId>.*)$|^https:\/\/youtube.com\/playlist\?list=(?<listId2>.{34})$/);
         const videoId = match.groups.videoId;
-        const listId = match.groups.listId;
+        const listId = match.groups.listId || match.groups.listId2;
         return await trovaListaYT(videoId, listId);
     }
     if (song.match(/^https:\/\/open\.spotify\.com\/(track|album|artist|playlist)\/.{22}/)){
-        const match = song.match(/https:\/\/open\.spotify\.com\/(?<resource>track|album|artist|playlist)\/(?<id>.{22})/).groups.id;
-        const id =  match.id;
-        const resource = match.resource;
+        const match = song.match(/https:\/\/open\.spotify\.com\/(?<resource>track|album|artist|playlist)\/(?<id>.{22})/);
+        const id =  match.groups.id;
+        const resource = match.groups.resource;
         return await trovaLinkSpotify(id, resource);
     }
-    return await ricercaTitolo(song);
+    return [await ricercaTitolo(song)];
 }
 
 const saluta = async (connection)=>{
@@ -191,7 +359,7 @@ const saluta = async (connection)=>{
     await finito;
 }
 
-const comando = async (song,position, member)=>{
+const comando = async (song,position, member,channel)=>{
     // controlla che l'utente sia in un canale vocale visibile 
     if (!member.voice.channel)
         return {
@@ -214,71 +382,65 @@ const comando = async (song,position, member)=>{
                 new EmbedBuilder()
                 .setTitle('Error!')
                 .setDescription("I'm already in another voice channel")
-                .setColor(colori.error)
+                .setColor(Colori.error)
             ]
         }
 
 
     // cerca la canzone (o le canzoni) e ritorna un messaggio d'errore se non si trova nulla
-    let canzoni;
     try {
-        canzoni = await trovaCanzoni(song);
+        var canzoni = await trovaCanzoni(song);
     }catch(error){
+        let errorMsg;
         switch (error.message){
             case errors.YouTubeVideoNotFound:
-                return {
-                    embeds: [
-                        new EmbedBuilder()
-                        .setTitle('Error!')
-                        .setDescription("The link you've provided doesn't seem to bring anywhere :o")
-                        .setColor(colori.error)
-                    ]
-                }
+                errorMsg = "The link you've provided doesn't seem to bring anywhere :o";
                 break;
             case errors.youTubeKeyExpired:
-                return {
-                    embeds: [
-                        new EmbedBuilder()
-                        .setTitle('Error!')
-                        .setDescription('We ran out of youtube quotas ¯\_(:P)_/¯')
-                        .setColor(colori.error)
-                    ]
-                }
+                errorMsg = 'We ran out of youtube quotas ¯\_(:P)_/¯';
                 break;
             case errors.YouTubePlaylistNotFound:
-                return {
-                    embeds: [
-                        new EmbedBuilder()
-                        .setTitle('Error!')
-                        .setDescription("The link you've provided doesn't seem to bring anywhere :o")
-                        .setColor(colori.error)
-                    ]
-                }
+                errorMsg = "The link you've provided doesn't seem to bring anywhere :o"
                 break;
+            case errors.SpotifyIdNotFound:
+                errorMsg = "The link you've provided doesn't seem to bring anywhere :o";
+                break;
+        }
+        if (!errorMsg)
+            throw error;
+        return {
+            embeds: [
+                new EmbedBuilder()
+                .setTitle('Error!')
+                .setDescription(errorMsg)
+                .setColor(Colori.error)
+            ]
         }
     }
 
 
     // se il bot non è in un canale vocale, entra e saluta
+    let salutando;
     if (!connection){
         connection = Discord.joinVoiceChannel({
             channelId: voiceChannel.id,
             guildId: guild.id,
             adapterCreator: guild.voiceAdapterCreator
         });
-        await saluta(connection);
+        salutando = saluta(connection);
     }
 
     if (!servers.has(guild.id))
         servers.set(guild.id, new Server(guild));
     const server = servers.get(guild.id);
-    
-    const posizione = (!position || position==-1)? server.queue.length : Math.min(Math.max(position,0), server.queue.length);
+
+    const posizione = ((!position || position==-1) && position!=0)? server.queue.length : Math.min(Math.max(position,0), server.queue.length);
     server.queue = [...server.queue.slice(0,posizione), ...canzoni, ...server.queue.slice(posizione)];
 
     // se il server non sta suonando nulla, inizia a suonare, altrimenti accoda e basta
     if (!server.isPlaying){
-        suona(server);
+        await salutando;
+        await suona(server, channel);
     }
 
     if (canzoni.length == 1)
@@ -338,7 +500,7 @@ module.exports = new Comando({
 
         await interaction.deferReply({ephemeral:false});
 
-        const response = await comando(song, position, interaction.member);
+        const response = await comando(song, position, interaction.member,interaction.channel);
         response.ephemeral = true;
         return await interaction.editReply(response);
 	},
@@ -350,12 +512,12 @@ module.exports = new Comando({
         const posizione = args[1];
 
         if (!canzone)
-            return message.channel.send({embeds:[new EmbedBuilder().setTitle('Error!').setDescription("No song specified.\nUse the `help` command to know more").setColor(colori.error)]});
-        if (isNaN(parseInt(posizione)))
-            return message.channel.send({embeds:[new EmbedBuilder().setTitle('Error!').setDescription("No song specified.\nUse the `help` command to know more").setColor(colori.error)]});
+            return message.channel.send({embeds:[new EmbedBuilder().setTitle('Error!').setDescription("No song specified.\nUse the `help` command to know more").setColor(Colori.error)]});
 
-        const response = await comando(canzone, posizione-1, message.member)
-        return await message.send(response);
+//        return message.channel.send({embeds:[new EmbedBuilder().setTitle('Error!').setDescription("No song specified.\nUse the `help` command to know more").setColor(Colori.error)]});
+
+        const response = await comando(canzone, posizione-1, message.member,message.channel);
+        return await message.channel.send(response);
     },
 
     example: '`-play` `song`\n-play `song` `[postition]`',

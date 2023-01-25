@@ -11,6 +11,7 @@ const commandFiles = fs.readdirSync('./comandi').filter(file => file.endsWith('.
 // Grab the SlashCommandBuilder#toJSON() output of each command's data for deployment
 for (const file of commandFiles) {
 	const command = require(`./comandi/${file}`);
+	console.log(command.data);
 	commands.push(command.data.toJSON());
 }
 
@@ -24,6 +25,7 @@ const rest = new REST({ version: '10' }).setToken(TOKEN);
 
 		// The put method is used to fully refresh all commands in the guild with the current set
         const data = await rest.put(
+			//Routes.applicationGuildCommands(CLIENT_ID, '754446825699672145'),
 			Routes.applicationCommands(CLIENT_ID),
 			{ body: commands },
 		);

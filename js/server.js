@@ -13,6 +13,9 @@ class Server {
         this.radioTrack1=undefined;
         this.radioTrack2=undefined;
         this.isPlaying=false;
+
+        this.corrente = undefined;
+        this.pastSongs = [];
     }
 }
 

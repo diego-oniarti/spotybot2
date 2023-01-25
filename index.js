@@ -4,8 +4,10 @@ const path = require('node:path');
 const { Server } = require('./js/server');
 const { Client, Events, GatewayIntentBits, EmbedBuilder } = require('discord.js');
 const { Colori } = require('./js/colori');
+const {servers} = require('./shared');
 
 require('dotenv').config();
+const comandi = require('./js/comandi');
 
 // creazione del Bot
 const TOKEN = process.env.TOKEN;
@@ -21,9 +23,6 @@ client.once(Events.ClientReady, c => {
 	console.log(`Ready! Logged in as ${c.user.tag}`);
 });
 
-const servers = new Map();
-module.exports = {servers: servers};
-const comandi = require('./js/comandi');
 
 // importo dei comandi
 client.commands = comandi;
@@ -41,7 +40,6 @@ const errorMsg = {
 // gestione degli Slash Commands
 client.on(Events.InteractionCreate, async interaction => {
     if (!interaction.isChatInputCommand()) return;
-	console.log(servers);
     const command = client.commands.get(interaction.commandName);
 
 	if (!command) {
@@ -49,6 +47,7 @@ client.on(Events.InteractionCreate, async interaction => {
 		return;
 	}
 
+	console.log(command.data.name);
 	await command.execute(interaction)
     .catch(async error=>{
 		console.error(error);
@@ -69,17 +68,23 @@ client.on(Events.MessageCreate, async message => {
     if (!message.content.startsWith('-')) return;
 	message.content=message.content.slice(1);
     const args = message.content.split(' ').filter(arg=>arg.trim()!='');
+	
 	const nomeComando = args.shift();
 
 	const comando = client.commands.find(command=>{return command.aliases.includes(nomeComando)});
-	await comando.executeMsg(message, args)
-	.catch(async error=>{
-		console.error(error);
-		await message.reply(errorMsg)
-		.catch(error=>{
+	if (comando) {
+		console.log(message.content);
+
+		try {
+			await comando.executeMsg(message, args)
+		} catch (error) {
 			console.error(error);
-		});
-	});
+			await message.reply(errorMsg)
+			.catch(error=>{
+				console.error(error);
+			});
+		}
+	}
 });
 
 client.login(TOKEN);
