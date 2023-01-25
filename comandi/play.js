@@ -462,64 +462,66 @@ const comando = async (song,position, member,channel)=>{
         };
 }
 
-module.exports = new Comando({
-	data: new SlashCommandBuilder()
-		.setName('play')
-		.setDescription('Plays a song or adds it to the queue')
-        .setDescriptionLocalizations({
-            it: "Riproduce una canzone o la aggiunge alla coda"
-        })
-        .addStringOption(option=>
-            option
-            .setName("song")
-            .setNameLocalizations({
-                it: "canzone"
-            })
-            .setDescription("YouTube link / Spotify link / YouTube query")
+module.exports = {
+    comando: new Comando({
+        data: new SlashCommandBuilder()
+            .setName('play')
+            .setDescription('Plays a song or adds it to the queue')
             .setDescriptionLocalizations({
-                it: "link di YouTube / link di Spotify / ricerca su YouTube"
+                it: "Riproduce una canzone o la aggiunge alla coda"
             })
-            .setRequired(true)
-        )
-        .addIntegerOption(option=>
-            option
-            .setName("position")
-            .setNameLocalizations({
-                it: "posizione"
-            })
-            .setDescription("Position in the queue where to add the song")
-            .setDescriptionLocalizations({
-                it: "Posizione in coda dove inserire la canzone"
-            })
-            .setMinValue(1)
-            .setRequired(false)
-        ),
-	execute: async (interaction) => {
-        const song = interaction.options.getString("song");
-        const position = interaction.options.getInteger("position")-1;
+            .addStringOption(option=>
+                option
+                .setName("song")
+                .setNameLocalizations({
+                    it: "canzone"
+                })
+                .setDescription("YouTube link / Spotify link / YouTube query")
+                .setDescriptionLocalizations({
+                    it: "link di YouTube / link di Spotify / ricerca su YouTube"
+                })
+                .setRequired(true)
+            )
+            .addIntegerOption(option=>
+                option
+                .setName("position")
+                .setNameLocalizations({
+                    it: "posizione"
+                })
+                .setDescription("Position in the queue where to add the song")
+                .setDescriptionLocalizations({
+                    it: "Posizione in coda dove inserire la canzone"
+                })
+                .setMinValue(1)
+                .setRequired(false)
+            ),
+        execute: async (interaction) => {
+            const song = interaction.options.getString("song");
+            const position = interaction.options.getInteger("position")-1;
 
-        await interaction.deferReply({ephemeral:false});
+            await interaction.deferReply({ephemeral:false});
 
-        const response = await comando(song, position, interaction.member,interaction.channel);
-        response.ephemeral = true;
-        return await interaction.editReply(response);
-	},
+            const response = await comando(song, position, interaction.member,interaction.channel);
+            response.ephemeral = true;
+            return await interaction.editReply(response);
+        },
 
 
-    aliases: ['play', 'p'],
-    executeMsg: async (message,args)=>{
-        const canzone = args.join(' ');
+        aliases: ['play', 'p'],
+        executeMsg: async (message,args)=>{
+            const canzone = args.join(' ');
 
-        if (!canzone)
-            return message.channel.send({embeds:[new EmbedBuilder().setTitle('Error!').setDescription("No song specified.\nUse the `help` command to know more").setColor(Colori.error)]});
+            if (!canzone)
+                return message.channel.send({embeds:[new EmbedBuilder().setTitle('Error!').setDescription("No song specified.\nUse the `help` command to know more").setColor(Colori.error)]});
 
-//        return message.channel.send({embeds:[new EmbedBuilder().setTitle('Error!').setDescription("No song specified.\nUse the `help` command to know more").setColor(Colori.error)]});
+    //        return message.channel.send({embeds:[new EmbedBuilder().setTitle('Error!').setDescription("No song specified.\nUse the `help` command to know more").setColor(Colori.error)]});
 
-        const response = await comando(canzone, undefined, message.member,message.channel);
-        return await message.channel.send(response);
-    },
+            const response = await comando(canzone, undefined, message.member,message.channel);
+            return await message.channel.send(response);
+        },
 
-    example: '`-play` `song`\n-play `song` `[postition]`',
-    description: 'Plays a song or adds it to the queue.',
-    parameters: '`song`: the title or the link of the song/playlist you want to be played (supports both YouTube and Spotify)\n`[position]: The position in the queue where to insert the song. If not specified, the song will be inserted at the end of the queue`'
-});
+        example: '`-play` `song`\n-play `song` `[postition]`',
+        description: 'Plays a song or adds it to the queue.',
+        parameters: '`song`: the title or the link of the song/playlist you want to be played (supports both YouTube and Spotify)\n`[position]: The position in the queue where to insert the song. If not specified, the song will be inserted at the end of the queue`'
+    })
+}

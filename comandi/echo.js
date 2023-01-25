@@ -16,69 +16,71 @@ const esegui= async (messaggio, delay)=>{
     }
 }
 
-module.exports = new Comando({
-	data: new SlashCommandBuilder()
-		.setName('echo')
-		.setDescription('Repeats what you say after a delay')
-        .setDescriptionLocalizations({
-            it: "Ripete quello che dici dopo un ritardo"
-        })
-        .addStringOption(option=>
-            option
-            .setName("message")
-            .setNameLocalizations({
-                it: "messaggio"
-            })
-            .setDescription("What to reply")
+module.exports = {
+    comando: new Comando({
+        data: new SlashCommandBuilder()
+            .setName('echo')
+            .setDescription('Repeats what you say after a delay')
             .setDescriptionLocalizations({
-                it: "Cosa ripetere"
+                it: "Ripete quello che dici dopo un ritardo"
             })
-            .setRequired(true)
-        )
-        .addIntegerOption(option=>
-            option
-            .setName("delay")
-            .setNameLocalizations({
-                it: "ritardo"
-            })
-            .setDescription("Delay in ms")
-            .setDescriptionLocalizations({
-                it: "Ritardo in ms"
-            })
-            .setMinValue(0)
-            .setMaxValue(5000)
-            .setRequired(false)
-    ),
-	execute: async(interaction) => {
-        const message = interaction.options.getString("message");
-        const delay = interaction.options.getInteger("delay") || 0;
+            .addStringOption(option=>
+                option
+                .setName("message")
+                .setNameLocalizations({
+                    it: "messaggio"
+                })
+                .setDescription("What to reply")
+                .setDescriptionLocalizations({
+                    it: "Cosa ripetere"
+                })
+                .setRequired(true)
+            )
+            .addIntegerOption(option=>
+                option
+                .setName("delay")
+                .setNameLocalizations({
+                    it: "ritardo"
+                })
+                .setDescription("Delay in ms")
+                .setDescriptionLocalizations({
+                    it: "Ritardo in ms"
+                })
+                .setMinValue(0)
+                .setMaxValue(5000)
+                .setRequired(false)
+        ),
+        execute: async(interaction) => {
+            const message = interaction.options.getString("message");
+            const delay = interaction.options.getInteger("delay") || 0;
 
-        await interaction.deferReply({ephemeral:true});
-        const reply = await esegui(message,delay);
-        return await interaction.editReply(reply);
-	},
+            await interaction.deferReply({ephemeral:true});
+            const reply = await esegui(message,delay);
+            return await interaction.editReply(reply);
+        },
 
-    aliases: ['echo'],
+        aliases: ['echo'],
 
-    executeMsg: async (messaggio, args) => {
-        const message = args[0];
-        const delay = args[1] || 0;
+        executeMsg: async (messaggio, args) => {
+            const message = args[0];
+            const delay = args[1] || 0;
 
-        if (!message || isNaN(parseInt(delay)) || parseInt(delay)<0)
-            return await messaggio.channel.send({
-                embeds: [
-                    new EmbedBuilder()
-                    .setTitle(":warning: Error")
-                    .setDescription("Wrong parameters.\nUse the `help` command to get more instructions.")
-                    .setColor(Colori.error)
-                ]
-            })
+            if (!message || isNaN(parseInt(delay)) || parseInt(delay)<0)
+                return await messaggio.channel.send({
+                    embeds: [
+                        new EmbedBuilder()
+                        .setTitle(":warning: Error")
+                        .setDescription("Wrong parameters.\nUse the `help` command to get more instructions.")
+                        .setColor(Colori.error)
+                    ]
+                })
 
-        const reply = await esegui(message, delay);
-        return await messaggio.channel.send(reply);
-    },
+            const reply = await esegui(message, delay);
+            return await messaggio.channel.send(reply);
+        },
 
-    example: '`-echo` `message` `[delay]`',
-    description:  'Repeats what you say after a delay\nThe delay is specified in milliseconds',
-    parameters: '`message`: The message the bot will send back to you\n`[delay]`: The amount of time (ms) that the bot will wait before replying. If omitted this value is 0'
-});
+        example: '`-echo` `message` `[delay]`',
+        description:  'Repeats what you say after a delay\nThe delay is specified in milliseconds',
+        parameters: '`message`: The message the bot will send back to you\n`[delay]`: The amount of time (ms) that the bot will wait before replying. If omitted this value is 0'
+    })
+}
