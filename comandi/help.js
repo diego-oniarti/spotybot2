@@ -27,7 +27,7 @@ const esegui= async (comando)=>{
             ephemeral: true
         }
 
-    const cmd = require(path.join(__dirname,comando));
+    const cmd = require(path.join(__dirname,comando)).comando;
 
     const embed = new EmbedBuilder()
     .setTitle(comando)
@@ -46,56 +46,58 @@ const esegui= async (comando)=>{
     }
 }
 
-module.exports = new Comando({
-	data: new SlashCommandBuilder()
-		.setName('help')
-		.setDescription('Helps you with the bot or with specific commands')
-        .setDescriptionLocalizations({
-            it: "Ti aiuta nell'utilizzo del bot o di specifici comandi"
-        })
-        .addStringOption(option=>{
-            option
-            .setName("command")
-            .setNameLocalizations({
-                it: "comando"
-            })
-            .setDescription("The command you need help with")
+module.exports = {
+    comando: new Comando({
+        data: new SlashCommandBuilder()
+            .setName('help')
+            .setDescription('Helps you with the bot or with specific commands')
             .setDescriptionLocalizations({
-                it: "Il comando per cui ti serve aiuto"
+                it: "Ti aiuta nell'utilizzo del bot o di specifici comandi"
             })
-            .setRequired(false);
-            for (let comando of comandi){
-                option.addChoices({name: comando, value: comando});
-            }
-            
-            return option;
-        }),
+            .addStringOption(option=>{
+                option
+                .setName("command")
+                .setNameLocalizations({
+                    it: "comando"
+                })
+                .setDescription("The command you need help with")
+                .setDescriptionLocalizations({
+                    it: "Il comando per cui ti serve aiuto"
+                })
+                .setRequired(false);
+                for (let comando of comandi){
+                    option.addChoices({name: comando, value: comando});
+                }
+                
+                return option;
+            }),
 
-	execute: async(interaction) => {
-        const comando = interaction.options.getString("command");
+        execute: async(interaction) => {
+            const comando = interaction.options.getString("command");
 
-        const reply = await esegui(comando);
-        return await interaction.reply(reply);
-	},
+            const reply = await esegui(comando);
+            return await interaction.reply(reply);
+        },
 
-    aliases: ['help'],
+        aliases: ['help'],
 
-    executeMsg: async (messaggio, args) => {
-        const comando = args[0];
-        if (comando && !comandi.includes(comando))
-            return await messaggio.channel.send({
-                embeds: [
-                    new EmbedBuilder()
-                    .setTitle(":warning: Error")
-                    .setDescription("Wrong parameters.\nUse the `help` command to get more instructions.")
-                    .setColor(Colori.error)
-                ]
-            });
-        const reply = await esegui(comando);
-        return await messaggio.channel.send(reply);
-    },
+        executeMsg: async (messaggio, args) => {
+            const comando = args[0];
+            if (comando && !comandi.includes(comando))
+                return await messaggio.channel.send({
+                    embeds: [
+                        new EmbedBuilder()
+                        .setTitle(":warning: Error")
+                        .setDescription("Wrong parameters.\nUse the `help` command to get more instructions.")
+                        .setColor(Colori.error)
+                    ]
+                });
+            const reply = await esegui(comando);
+            return await messaggio.channel.send(reply);
+        },
 
-    example: '`-help` `[command]`',
-    description: 'Helps you with the bot or with specific commands',
-    parameters: '`command`: the command you need help with'
-});
+        example: '`-help` `[command]`',
+        description: 'Helps you with the bot or with specific commands',
+        parameters: '`command`: the command you need help with'
+    })
+}

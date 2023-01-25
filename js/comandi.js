@@ -8,7 +8,7 @@ const commandsPath = path.join(__dirname, '..', 'comandi');
 const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
 for (const file of commandFiles) {
 	const filePath = path.join(commandsPath, file);
-	const command = require(filePath);
+	const command = require(filePath).comando;
 	if ('data' in command && 'execute' in command) {
 		comandi.set(command.data.name, command);
 	} else {
