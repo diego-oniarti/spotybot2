@@ -45,7 +45,8 @@ const getSpotifyToken = async ()=>{
 
 const fineCanzone = (server,channel)=>{
     return ()=>{
-        server.pastSongs.push(server.corrente);
+        if (server.corrente)
+            server.pastSongs.push(server.corrente);
         server.audioResource = null;
         if (server.queue.length>0){
             suona(server,channel);
