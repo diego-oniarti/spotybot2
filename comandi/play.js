@@ -317,15 +317,15 @@ const trovaCanzoneYT = async (videoId)=>{
 
 //deve ritornare un lista di canzoni
 const trovaCanzoni = async (song)=>{
-    if (song.match(/^https:\/\/youtu\.be\/.{11}$|^https:\/\/www\.youtube\.com\/watch\?v=.{11}$/)){
-        const match = song.match(/^https:\/\/youtu\.be\/(?<videoId>.{11})$|^https:\/\/www\.youtube\.com\/watch\?v=(?<videoId2>.{11})$/);
+    if (song.match(/^https:\/\/youtu\.be\/.{11}$|^https:\/\/(www\.)?youtube\.com\/watch\?v=.{11}$/)){
+        const match = song.match(/^https:\/\/youtu\.be\/(?<videoId>.{11})$|^https:\/\/(www\.)?youtube\.com\/watch\?v=(?<videoId2>.{11})$/);
         const videoId = match.groups.videoId || match.groups.videoId2;
         return [await trovaCanzoneYT(videoId)];
     }
     // https://www.youtube.com/watch?v=QN1odfjtMoo&list=PLG7bQTXLuEouQFSnPUY6mFuJRf7ULbZbo
     // https://youtube.com/playlist?list=PLvwkDL8hMpWr2hyMgQwj9wHQINqwpTqWc
-    if (song.match(/^https:\/\/www\.youtube\.com\/watch\?v=.{11}&list=.*$|^https:\/\/youtube.com\/playlist\?list=.{34}$/)){
-        const match = song.match(/^https:\/\/www\.youtube\.com\/watch\?v=(?<videoId>.{11})&list=(?<listId>.*)$|^https:\/\/youtube.com\/playlist\?list=(?<listId2>.{34})$/);
+    if (song.match(/^https:\/\/(www\.)?youtube\.com\/watch\?v=.{11}&list=.*$|^https:\/\/(www\.)?youtube\.com\/playlist\?list=.{34}$/)){
+        const match = song.match(/^https:\/\/(www\.)?youtube\.com\/watch\?v=(?<videoId>.{11})&list=(?<listId>.*)$|^https:\/\/(www\.)?youtube.com\/playlist\?list=(?<listId2>.{34})$/);
         const videoId = match.groups.videoId;
         const listId = match.groups.listId || match.groups.listId2;
         return await trovaListaYT(videoId, listId);
@@ -508,15 +508,14 @@ module.exports = new Comando({
 
     aliases: ['play', 'p'],
     executeMsg: async (message,args)=>{
-        const canzone = args[0];
-        const posizione = args[1];
+        const canzone = args.join(' ');
 
         if (!canzone)
             return message.channel.send({embeds:[new EmbedBuilder().setTitle('Error!').setDescription("No song specified.\nUse the `help` command to know more").setColor(Colori.error)]});
 
 //        return message.channel.send({embeds:[new EmbedBuilder().setTitle('Error!').setDescription("No song specified.\nUse the `help` command to know more").setColor(Colori.error)]});
 
-        const response = await comando(canzone, posizione-1, message.member,message.channel);
+        const response = await comando(canzone, undefined, message.member,message.channel);
         return await message.channel.send(response);
     },
 
