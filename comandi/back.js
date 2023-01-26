@@ -4,7 +4,11 @@ const Comando = require('../js/comando');
 const { servers } = require('../shared');
 const {fineCanzone} = require('./play'); 
 
-const comando = async (quantita, gilda,channel)=>{
+const comando = async (quantita, gilda,channel,member)=>{
+    const sameVCError = requisiti.sameVoiceChannel(member);
+    if (sameVCError)
+        return sameVCError;
+
     const server = servers.get(gilda.id);
     if (!server)
         return {
@@ -26,7 +30,7 @@ const comando = async (quantita, gilda,channel)=>{
 
     return {
         embeds: [ new EmbedBuilder()
-            .setTitle(`Backed ${vecchie.length+1} songs`)
+            .setTitle(`Backed ${vecchie.length} songs`)
             .setColor(Colori.default)
         ]
     };
@@ -56,7 +60,7 @@ module.exports = {
             const quantita = interaction.options.getInteger('amount') || 1;
 
             await interaction.deferReply();
-            const reply = await comando(quantita, interaction.guild, interaction.channel);
+            const reply = await comando(quantita, interaction.guild, interaction.channel, interaction.member);
             return await interaction.editReply(reply);
         },
 
@@ -74,7 +78,7 @@ module.exports = {
                     ]
                 });
 
-            const reply = await comando(quantita, message.guild, message.channel);
+            const reply = await comando(quantita, message.guild, message.channel, message.member);
             console.log(reply)
             await message.channel.send(reply);
         },

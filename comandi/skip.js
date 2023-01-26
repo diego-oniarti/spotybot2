@@ -3,7 +3,7 @@ const { Colori } = require('../js/colori');
 const Comando = require('../js/comando');
 const requisiti = require('../js/requisiti');
 const { servers } = require('../shared');
-const {fineCanzone, suona} = require('./play'); 
+const {fineCanzone} = require('./play'); 
 
 const comando = async (quantita, gilda,channel,member)=>{
     const sameVCError = requisiti.sameVoiceChannel(member);
