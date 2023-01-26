@@ -1,10 +1,32 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
-const colori = require('../js/colori');
 const { Colori } = require('../js/colori');
 const Comando = require('../js/comando');
+const { servers } = require('../shared');
+const {fineCanzone, suona} = require('./play'); 
 
-const skip 
+const comando = async (quantita, gilda,channel)=>{
+    const server = servers.get(gilda.id);
+    if (!server)
+        return {
+            embeds: [new EmbedBuilder()
+                .setTitle('Error!')
+                .setDescription("I'm not even playing")
+                .setColor(Colori.error)
+            ]
+        }
 
+    
+    const tolte = server.queue.splice(0,quantita-1).filter(a=>a);
+    fineCanzone(server,channel)();
+    server.pastSongs.push(...tolte);
+
+    return {
+        embeds: [ new EmbedBuilder()
+            .setTitle(`Skipped ${quantita} songs`)
+            .setColor(Colori.default)
+        ]
+    };
+}
 
 module.exports = {
     comando: new Comando({
@@ -14,7 +36,7 @@ module.exports = {
             .setDescriptionLocalizations({
                 it: 'Salta una certa quantità di canzoni'
             })
-            .addIntegerOption(option=>{option
+            .addIntegerOption(option=>option
                 .setName('amount')
                 .setNameLocalizations({
                     it: 'quantità'
@@ -24,35 +46,37 @@ module.exports = {
                     it: 'quantità di canzoni da saltare'
                 })
                 .setMinValue(1)
-                .setRequired(false);
-            }),
+                .setRequired(false)
+            ),
         execute: async (interaction) => {
             const quantita = interaction.options.getInteger('amount') || 1;
 
             await interaction.deferReply();
-            const reply = comando(quantita);
-            return await interaction.reply(reply);
+            const reply = await comando(quantita, interaction.guild, interaction.channel);
+            return await interaction.editReply(reply);
         },
 
         aliases: ['skip', 's', 'next', 'n'],
 
         executeMsg: async (message,  args) => {
-            const quantita = Math.max(0, args[0] || 0);
+            const quantita = Math.max(1, args[0] || 1);
             if (isNaN(parseInt(quantita)))
                 return await message.channel.send({
                     embeds: [
                         new EmbedBuilder()
                         .setTitle('Error!')
                         .setDescription(`${args[0]} is not a number`)
-                        .setColor(colori.error)
+                        .setColor(Colori.error)
                     ]
-                })
+                });
 
-            const reply = comando(quantita);
-            message.channel.send(reply);
+            const reply = await comando(quantita, message.guild, message.channel);
+            console.log(reply)
+            await message.channel.send(reply);
         },
 
-        example: '`-ping`',
-        description: 'Replies with Pong!'
+        example: '`-skip` [`amount`]',
+        description: 'Skips a given amount of songs',
+        parameters: '[`amount`]: the amount of songs to skip'
     })
 };

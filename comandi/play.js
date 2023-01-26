@@ -178,7 +178,7 @@ const spotifyAlbum = async (id)=>{
             titoli.push(trackToTitle(track));
         }
         if (data.next){
-            titoli.push(... (await (iteraLink(next) )));
+            titoli.push(... (await (iteraLink(data.next) )));
         }
 
         return titoli;
@@ -225,7 +225,7 @@ const spotifyPlaylist = async (id) =>{
             titoli.push(trackToTitle(item.track));
         }
         if (data.next){
-            titoli.push(... (await (iteraLink(next) )));
+            titoli.push(... (await (iteraLink(data.next) )));
         }
 
         return titoli;
@@ -497,7 +497,7 @@ module.exports = {
                 .setRequired(false)
             ),
         execute: async (interaction) => {
-            const song = interaction.options.getString("song");
+            const song = interaction.options.getString("song").trim();
             const position = interaction.options.getInteger("position")-1;
 
             await interaction.deferReply({ephemeral:false});
@@ -524,5 +524,7 @@ module.exports = {
         example: '`-play` `song`\n-play `song` `[postition]`',
         description: 'Plays a song or adds it to the queue.',
         parameters: '`song`: the title or the link of the song/playlist you want to be played (supports both YouTube and Spotify)\n`[position]: The position in the queue where to insert the song. If not specified, the song will be inserted at the end of the queue`'
-    })
+    }),
+    fineCanzone: fineCanzone,
+    suona: suona
 }
