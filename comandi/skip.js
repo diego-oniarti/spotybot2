@@ -75,8 +75,8 @@ module.exports = {
             await message.channel.send(reply);
         },
 
-        example: '`-skip` [`amount`]',
+        example: '`-skip` `[amount]`',
         description: 'Skips a given amount of songs',
-        parameters: '[`amount`]: the amount of songs to skip'
+        parameters: '`[amount]`: the amount of songs to skip'
     })
 };

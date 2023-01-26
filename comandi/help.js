@@ -23,6 +23,7 @@ const esegui= async (comando)=>{
                         value: comandi.map(a=>{return ['`',a,'`'].join('')}).join(' ')
                     }
                 )
+                .setColor(Colori.default)
             ],
             ephemeral: true
         }
