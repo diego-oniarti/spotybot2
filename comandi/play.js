@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, discordSort, VoiceChannel } = require('discord.js');
 const Discord = require('@discordjs/voice');
 const ytdl = require('ytdl-core');
 const Comando = require('../js/comando');
@@ -44,18 +44,25 @@ const getSpotifyToken = async ()=>{
 }
 
 const fineCanzone = (server,channel)=>{
-    return ()=>{
+    return async ()=>{
         if (server.corrente)
             server.pastSongs.push(server.corrente);
         server.audioResource = null;
-        if (server.queue.length>0){
+
+        const connection = Discord.getVoiceConnection(server.guild.id);
+        const voiceChannelId = connection.joinConfig.channelId;
+        const voiceChannel = await server.guild.channels.fetch(voiceChannelId);
+
+        if (server.queue.length>0 && voiceChannel.members.size>1){
             suona(server,channel);
         } else {
             server.isPlaying=false;
             server.audioResource = undefined;
-            const connection = Discord.getVoiceConnection(server.guild.id);
             if (connection)
                 connection.destroy();
+            server.timeout = setTimeout(()=>{
+                servers.delete(server.guild.id);
+            },60000)
         }
     }
 }
@@ -434,6 +441,10 @@ const comando = async (song,position, member,channel)=>{
     if (!servers.has(guild.id))
         servers.set(guild.id, new Server(guild));
     const server = servers.get(guild.id);
+    if (server.timeout){
+        clearTimeout(server.timeout);
+        server.timeout=undefined;
+    }
 
     const posizione = ((!position || position==-1) && position!=0)? server.queue.length : Math.min(Math.max(position,0), server.queue.length);
     server.queue = [...server.queue.slice(0,posizione), ...canzoni, ...server.queue.slice(posizione)];
