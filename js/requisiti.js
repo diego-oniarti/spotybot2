@@ -1,3 +1,7 @@
+const { EmbedBuilder } = require('@discordjs/builders');
+const Discord = require('@discordjs/voice');
+const { Colori } = require('./colori');
+
 anyVoiceChannel = (member)=>{
     if (!member.voice.channel)
         return {
@@ -11,12 +15,13 @@ anyVoiceChannel = (member)=>{
 }
 
 sameVoiceChannel = (member)=>{
-    const anyVCError = anyVoiceChannel(member)
+    const anyVCError = anyVoiceChannel(member);
     if (anyVCError){
         return anyVCError;
     }
 
     const connection = Discord.getVoiceConnection(member.guild.id);
+    const voiceChannel = member.voice.channel;
     if (connection && (connection.joinConfig.channelId != voiceChannel.id))
         return {
             embeds: [
@@ -28,7 +33,21 @@ sameVoiceChannel = (member)=>{
         }
 }
 
+playing = (guild)=>{
+    const connection = Discord.getVoiceConnection(guild.id);
+    if (!connection)
+        return {
+            embeds: [
+                new EmbedBuilder()
+                .setTitle('Error!')
+                .setDescription("I'm not in a voice channel")
+                .setColor(Colori.error)
+            ]
+        }
+}
+
 module.exports = {
     anyVoiceChannel: anyVoiceChannel,
-    sameVoiceChannel: sameVoiceChannel
+    sameVoiceChannel: sameVoiceChannel,
+    playing: playing
 }

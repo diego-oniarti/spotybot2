@@ -514,7 +514,7 @@ module.exports = {
             return await message.channel.send(response);
         },
 
-        example: '`-play` `song`\n-play `song` `[postition]`',
+        example: '`-play` `song` `[postition]`',
         description: 'Plays a song or adds it to the queue.',
         parameters: '`song`: the title or the link of the song/playlist you want to be played (supports both YouTube and Spotify)\n`[position]: The position in the queue where to insert the song. If not specified, the song will be inserted at the end of the queue`'
     }),

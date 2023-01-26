@@ -79,7 +79,6 @@ module.exports = {
                 });
 
             const reply = await comando(quantita, message.guild, message.channel, message.member);
-            console.log(reply)
             await message.channel.send(reply);
         },
 
