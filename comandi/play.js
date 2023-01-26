@@ -10,7 +10,8 @@ require('dotenv').config();
 const { servers } = require('../shared');
 const { Server } = require('../js/server');
 
-const play = require('play-dl')
+const play = require('play-dl');
+const requisiti = require('../js/requisiti');
 
 const youtubeKey = process.env.YOUTUBE_KEY;
 const errors = {
@@ -361,32 +362,13 @@ const saluta = async (connection)=>{
 }
 
 const comando = async (song,position, member,channel)=>{
-    // controlla che l'utente sia in un canale vocale visibile 
-    if (!member.voice.channel)
-        return {
-            embeds: [
-                new EmbedBuilder()
-                .setTitle('Error!')
-                .setDescription("Where are you?\nI can't see you :eyes:")
-                .setColor(Colori.error)
-            ]
-        }
+    const sameVCError = requisiti.sameVoiceChannel(member);
+    if (sameVCError)
+        return sameVCError;
 
     const guild = member.guild;
     const voiceChannel = member.voice.channel;
-
     let connection = Discord.getVoiceConnection(guild.id)
-    // se il bot è già in un altro canale vocale rispondi con errore
-    if (connection && (connection.joinConfig.channelId != voiceChannel.id))
-        return {
-            embeds: [
-                new EmbedBuilder()
-                .setTitle('Error!')
-                .setDescription("I'm already in another voice channel")
-                .setColor(Colori.error)
-            ]
-        }
-
 
     // cerca la canzone (o le canzoni) e ritorna un messaggio d'errore se non si trova nulla
     try {

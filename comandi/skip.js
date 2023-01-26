@@ -1,10 +1,15 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const { Colori } = require('../js/colori');
 const Comando = require('../js/comando');
+const requisiti = require('../js/requisiti');
 const { servers } = require('../shared');
 const {fineCanzone, suona} = require('./play'); 
 
-const comando = async (quantita, gilda,channel)=>{
+const comando = async (quantita, gilda,channel,member)=>{
+    const sameVCError = requisiti.sameVoiceChannel(member);
+    if (sameVCError)
+        return sameVCError;
+
     const server = servers.get(gilda.id);
     if (!server)
         return {
@@ -52,7 +57,7 @@ module.exports = {
             const quantita = interaction.options.getInteger('amount') || 1;
 
             await interaction.deferReply();
-            const reply = await comando(quantita, interaction.guild, interaction.channel);
+            const reply = await comando(quantita, interaction.guild, interaction.channel, interaction.member);
             return await interaction.editReply(reply);
         },
 
@@ -70,7 +75,7 @@ module.exports = {
                     ]
                 });
 
-            const reply = await comando(quantita, message.guild, message.channel);
+            const reply = await comando(quantita, message.guild, message.channel, message.member);
             console.log(reply)
             await message.channel.send(reply);
         },
