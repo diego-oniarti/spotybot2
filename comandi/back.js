@@ -1,6 +1,7 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const { Colori } = require('../js/colori');
 const Comando = require('../js/comando');
+const requisiti = require('../js/requisiti');
 const { servers } = require('../shared');
 const {fineCanzone} = require('./play'); 
 

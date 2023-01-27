@@ -47,7 +47,7 @@ module.exports = {
                 return await interaction.editReply(reply);
         },
 
-        aliases: ['leave', 'quit'],
+        aliases: ['leave', 'quit', 'disconnect'],
 
         executeMsg: async (message,  args) => {
             const reply = await comando(message.member);

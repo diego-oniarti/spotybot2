@@ -19,7 +19,8 @@ const errors = {
     youTubeKeyExpired: 1,
     YouTubePlaylistNotFound: 2,
     YouTubeTitleNotFound: 3,
-    SpotifyIdNotFound: 4
+    SpotifyIdNotFound: 4,
+    InvalidSpotifyId: 5
 }
 
 let spotifyToken;
@@ -59,6 +60,8 @@ const fineCanzone = (server,channel)=>{
         } else {
             server.isPlaying=false;
             server.audioResource = undefined;
+            server.pastSongs.push(...server.queue);
+
             if (connection)
                 connection.destroy();
             server.timeout = setTimeout(()=>{
@@ -132,17 +135,18 @@ const ricercaTitolo = async (song)=>{
 }
 
 
-const parseSpotify = async(res)=>{
-    if (res.status == 400 && res.error.status=='invalid id'){
+const parseSpotify = async(data)=>{
+    if (data.error && data.error.status == 400 && data.error.message=='invalid id'){
+        throw errors.InvalidSpotifyId;
+    }
+    if (data.error && data.error.status == 404 && data.error.message.match(/^Non existing id: '.*'$/)){
         throw errors.SpotifyIdNotFound;
     }
-    if (res.error) {
-        console.log(res.error);
-        throw res.error;
+    if (data.error) {
+        console.error(data.error);
+        throw data.error;
     }
-    return await res.json();
 }
-
 
 const trackToTitle = (track)=>{
     const ricerca = [track.name];
@@ -159,11 +163,13 @@ const spotifyTrack = async (id)=>{
             'Authorization': `Bearer ${spotifyToken}`
         }
     });
-    if (res.status == 401 && res.error.message=='The access token expired'){
+    const data = await res.json();
+
+    if (res.status == 401 && data.error.message=='The access token expired'){
         getSpotifyToken();
         return (spotifyTrack(id));
     }
-    const data = await parseSpotify(res);
+    await parseSpotify(data);
 
     return trackToTitle(data);
 }
@@ -175,11 +181,13 @@ const spotifyAlbum = async (id)=>{
                 'Authorization': `Bearer ${spotifyToken}`
             }
         });
-        if (res.status == 401 && res.error.message=='The access token expired'){
+        const data = await res.json();
+
+        if (res.status == 401 && data.error.message=='The access token expired'){
             getSpotifyToken();
             return (iteraLink(link));
         }
-        const data = await parseSpotify(res);
+        await parseSpotify(data);
     
         const titoli = [];
         for (let track of data.items){
@@ -201,11 +209,13 @@ const spotifyArtist = async (id) =>{
             'Authorization': `Bearer ${spotifyToken}`
         }
     });
-    if (res.status == 401 && res.error.message=='The access token expired'){
+    const data = await res.json();
+    
+    if (res.status == 401 && data.error.message=='The access token expired'){
         getSpotifyToken();
         return (spotifyArtist(id));
     }
-    const data = await parseSpotify(res);
+    await parseSpotify(data);
 
     const titoli = [];
     for (let track of data.tracks){
@@ -222,11 +232,13 @@ const spotifyPlaylist = async (id) =>{
                 'Authorization': `Bearer ${spotifyToken}`
             }
         });
-        if (res.status == 401 && res.error.message=='The access token expired'){
+        const data = await res.json();
+
+        if (res.status == 401 && data.error.message=='The access token expired'){
             getSpotifyToken();
             return (iteraLink(link));
         }
-        const data = await parseSpotify(res);
+        await parseSpotify(data);
     
         const titoli = [];
         for (let item of data.items){
@@ -382,7 +394,7 @@ const comando = async (song,position, member,channel)=>{
         var canzoni = await trovaCanzoni(song);
     }catch(error){
         let errorMsg;
-        switch (error.message){
+        switch (error){
             case errors.YouTubeVideoNotFound:
                 errorMsg = "The link you've provided doesn't seem to bring anywhere :o";
                 break;
@@ -395,6 +407,11 @@ const comando = async (song,position, member,channel)=>{
             case errors.SpotifyIdNotFound:
                 errorMsg = "The link you've provided doesn't seem to bring anywhere :o";
                 break;
+            case errors.InvalidSpotifyId:
+                errorMsg = "The link you've provided seems to be malformed";
+                break;
+            default:
+                throw error;
         }
         if (!errorMsg)
             throw error;
@@ -516,7 +533,7 @@ module.exports = {
 
         example: '`-play` `song` `[postition]`',
         description: 'Plays a song or adds it to the queue.',
-        parameters: '`song`: the title or the link of the song/playlist you want to be played (supports both YouTube and Spotify)\n`[position]: The position in the queue where to insert the song. If not specified, the song will be inserted at the end of the queue`'
+        parameters: '`song`: the title or the link of the song/playlist you want to be played (supports both YouTube and Spotify)\n`[position]`: The position in the queue where to insert the song. If not specified, the song will be inserted at the end of the queue'
     }),
     fineCanzone: fineCanzone,
     suona: suona
