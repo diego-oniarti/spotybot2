@@ -1,10 +1,8 @@
 // Require the necessary discord.js classes
 const fs = require('node:fs');
 const path = require('node:path');
-const { Server } = require('./js/server');
 const { Client, Events, GatewayIntentBits, EmbedBuilder } = require('discord.js');
 const { Colori } = require('./js/colori');
-const {servers} = require('./shared');
 
 require('dotenv').config();
 const comandi = require('./js/comandi');

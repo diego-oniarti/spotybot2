@@ -9,22 +9,35 @@ const fetch = require('node-fetch');
 require('dotenv').config();
 const { servers } = require('../shared');
 const { Server } = require('../js/server');
-
+const cliProgress = require('cli-progress');
+const querystring = require('node:querystring');
 const play = require('play-dl');
 const requisiti = require('../js/requisiti');
+
+const barStile = (nome)=>{
+    if (nome)
+        nome+=' ';
+    else
+        nome=''
+    return {
+        format: `${nome}|{bar}| {percentage}% | DURATION: {duration} | ETA: {eta}s | {value}/{total}`,
+    }
+}
 
 const youtubeKey = process.env.YOUTUBE_KEY;
 const errors = {
     YouTubeVideoNotFound: 0,
-    youTubeKeyExpired: 1,
+    YouTubeKeyExpired: 1,
     YouTubePlaylistNotFound: 2,
     YouTubeTitleNotFound: 3,
     SpotifyIdNotFound: 4,
-    InvalidSpotifyId: 5
+    InvalidSpotifyId: 5,
+    YouTubeSearchNotFound: 6
 }
 
 let spotifyToken;
 
+// refresha il token di spotify (scade dopo un'ora) che serve per ogni chiamata alle API di spotify
 const getSpotifyToken = async ()=>{
     const client_id = process.env.SPOTIFY_CLIENT_ID;
     const client_secret = process.env.SPOTIFY_CLIENT_SECRET;
@@ -42,11 +55,14 @@ const getSpotifyToken = async ()=>{
     const data = await res.json();
 
     spotifyToken = data.access_token;
+    console.log(`new access token: ${data.access_token}`);
     return data.access_token;
 }
 
+// ritorna una funzione che detta il comportamento del bot quando finisce una canzone
 const fineCanzone = (server,channel)=>{
     return async ()=>{
+        // aggiunge la canzone appena finita alle pastSongs
         if (server.corrente)
             server.pastSongs.push(server.corrente);
         server.audioResource = null;
@@ -70,6 +86,8 @@ const fineCanzone = (server,channel)=>{
         }
     }
 }
+
+// se succede un errore, stampa il messaggio d'errore e passa alla prossima canzone
 const erroreCanzone = (server,channel)=>{
     return (error)=>{
         console.error(error);
@@ -77,6 +95,7 @@ const erroreCanzone = (server,channel)=>{
     }
 }
 
+// inizia a suonare
 const suona = async (server, channel) => {
     let connection = Discord.getVoiceConnection(server.guild.id);
 
@@ -84,7 +103,12 @@ const suona = async (server, channel) => {
     server.corrente = canzone;
 
     //const stream = ytdl(canzone.link, {filter:'audioonly'});
-    const stream = await play.stream(canzone.link);
+    try{
+        var stream = await play.stream(canzone.link);
+    }catch(error){
+        console.error(`play-dl non trova '${canzone.titolo}' ${canzone.link}`);
+        await (fineCanzone(server,channel)());
+    }
 
     const player = Discord.createAudioPlayer();
     const resource = Discord.createAudioResource(stream.stream, {
@@ -97,7 +121,7 @@ const suona = async (server, channel) => {
     connection.subscribe(player);
     server.isPlaying=true;
     try{
-        channel.send({
+        await channel.send({
             embeds: [
                 new EmbedBuilder()
                 .setTitle('Now Playing')
@@ -121,25 +145,42 @@ const suona = async (server, channel) => {
 /* canzone: {link, titolo, file} */
 
 const ricercaTitolo = async (song)=>{
-    let pagina = await fetch(encodeURI(`https://www.youtube.com/results?search_query=${song}`))
+    try{
+        var pagina = await fetch(encodeURI(`https://www.youtube.com/results?${querystring.stringify({
+            search_query: `${song} lyrics`,
+            aqs: 'chrome.0.0i512j0i22i30l5.2443j0j15',
+            sourceid: 'chrome',
+            ie: 'UTF-8'
+        })}`));
+    }catch(error){
+        console.error(error);
+        throw error;
+    }
+
     try{
         var html = await pagina.text();
     }catch(error){
         console.error(error);
         throw errors.YouTubeTitleNotFound;
     }
-    token = html.match(/\"videoId\"\:\"(.{1,12})\"/)[1];
+    
+    const match = html.match(/\"videoId\"\:\"(.{1,12})\"/);
+    if (match)
+        token = match[1];
+    else{
+        console.error(`Not found ${song}`);
+        throw errors.YouTubeTitleNotFound;
+    }
     if (!token)
         throw errors.YouTubeTitleNotFound;
     return trovaCanzoneYT(token);
 }
 
-
 const parseSpotify = async(data)=>{
     if (data.error && data.error.status == 400 && data.error.message=='invalid id'){
         throw errors.InvalidSpotifyId;
     }
-    if (data.error && data.error.status == 404 && data.error.message.match(/^Non existing id: '.*'$/)){
+    if (data.error && data.error.status == 404){
         throw errors.SpotifyIdNotFound;
     }
     if (data.error) {
@@ -166,7 +207,7 @@ const spotifyTrack = async (id)=>{
     const data = await res.json();
 
     if (res.status == 401 && data.error.message=='The access token expired'){
-        getSpotifyToken();
+        await getSpotifyToken();
         return (spotifyTrack(id));
     }
     await parseSpotify(data);
@@ -175,6 +216,9 @@ const spotifyTrack = async (id)=>{
 }
 
 const spotifyAlbum = async (id)=>{
+    const bar = new cliProgress.SingleBar(barStile('album-tracks'), cliProgress.Presets.shades_classic);
+    let primo = true;
+
     const iteraLink = async (link)=>{
         const res = await fetch(link,{
             headers: {
@@ -184,13 +228,18 @@ const spotifyAlbum = async (id)=>{
         const data = await res.json();
 
         if (res.status == 401 && data.error.message=='The access token expired'){
-            getSpotifyToken();
+            await getSpotifyToken();
             return (iteraLink(link));
         }
         await parseSpotify(data);
     
         const titoli = [];
+        if (primo){
+            bar.start(data.total);
+            primo = false;
+        }
         for (let track of data.items){
+            bar.increment();
             titoli.push(trackToTitle(track));
         }
         if (data.next){
@@ -200,7 +249,9 @@ const spotifyAlbum = async (id)=>{
         return titoli;
     }
 
-    return await iteraLink(`https://api.spotify.com/v1/albums/${id}/tracks?limit=50`);
+    const titoli = await iteraLink(`https://api.spotify.com/v1/albums/${id}/tracks?limit=50`);
+    bar.stop();
+    return titoli;
 }
 
 const spotifyArtist = async (id) =>{
@@ -212,7 +263,7 @@ const spotifyArtist = async (id) =>{
     const data = await res.json();
     
     if (res.status == 401 && data.error.message=='The access token expired'){
-        getSpotifyToken();
+        await getSpotifyToken();
         return (spotifyArtist(id));
     }
     await parseSpotify(data);
@@ -226,6 +277,9 @@ const spotifyArtist = async (id) =>{
 }
 
 const spotifyPlaylist = async (id) =>{
+    const bar = new cliProgress.SingleBar(barStile('playlist-tracks'), cliProgress.Presets.shades_classic);
+    let primo = true;
+
     const iteraLink = async (link)=>{
         const res = await fetch(link,{
             headers: {
@@ -235,13 +289,19 @@ const spotifyPlaylist = async (id) =>{
         const data = await res.json();
 
         if (res.status == 401 && data.error.message=='The access token expired'){
-            getSpotifyToken();
+            await getSpotifyToken();
             return (iteraLink(link));
         }
         await parseSpotify(data);
+
+        if (primo){
+            bar.start(data.total);
+            primo = false;
+        }
     
         const titoli = [];
         for (let item of data.items){
+            bar.increment();
             titoli.push(trackToTitle(item.track));
         }
         if (data.next){
@@ -251,11 +311,34 @@ const spotifyPlaylist = async (id) =>{
         return titoli;
     }
 
-    return await iteraLink(`https://api.spotify.com/v1/playlists/${id}/tracks?limit=50&market=IT`);
+    const titoli = await iteraLink(`https://api.spotify.com/v1/playlists/${id}/tracks?limit=50&market=IT`);
+    bar.stop(); 
+    return titoli;
 }
 
+const updateDiscordBar = (interaction,bar)=>{
+    let ended = false;
+    if (interaction){
+        const updater = setInterval(()=>{
+            if (!ended)
+            interaction.editReply({
+                embeds: [
+                    new EmbedBuilder()
+                    .setTitle('Looking for songs')
+                    .setDescription(`|${'\u2588'.repeat(Math.floor(bar.getProgress()*40))}${'\u2591'.repeat(Math.ceil((1-bar.getProgress())*40))}|`)
+                    .setColor(Colori.default)
+                ]
+            });
+        },2500)
+        bar.on('stop', ()=>{
+            clearInterval(updater);
+            ended=true;
+            interaction=undefined;  
+        });
+    }
+}
 
-const trovaLinkSpotify = async(id, resource)=>{
+const trovaLinkSpotify = async(id, resource, interaction)=>{
     const titoli = [];
     if (!spotifyToken){
         await getSpotifyToken();
@@ -276,22 +359,76 @@ const trovaLinkSpotify = async(id, resource)=>{
             break;
     }
 
-    const canzoni = await Promise.all(
-        titoli.map(titolo=>ricercaTitolo(titolo))
-    );
+    const titoliBatch = [];
+    for (i=0; i<titoli.length; i+=50){
+        titoliBatch.push(titoli.slice(i, i+50));
+    }
+
+    const canzoni = [];
+
+    const bar = new cliProgress.SingleBar(barStile('resolving titles'), cliProgress.Presets.shades_classic);
+    bar.start(titoli.length, 0);
+    updateDiscordBar(interaction,bar);
+
+    for (let batch of titoliBatch){
+        canzoni.push(
+
+            ... (await Promise.all(
+                batch.map(titolo=>{
+                    return ( async () => {
+                        try{
+                            var canzone = await ricercaTitolo(titolo);
+                        }catch(e){
+                            console.error(e);
+                            if (e==errors.YouTubeKeyExpired)
+                                throw e
+                        }
+                        bar.increment();
+                        return canzone;
+                    } )()
+                })
+            )
+        ).filter(a=>a));
+    }
+    bar.stop();
+
+    // fare tutte le chiamate simultaneamente fa generare errori eccessivi
+    /*const bar = new cliProgress.SingleBar(barStile('Ricerca canzoni'), cliProgress.Presets.shades_classic);
+    bar.start(titoli.length,0);
+
+    const canzoni = (await Promise.all(
+                titoli.map(titolo=>{
+                    return ( async () => {
+                        try{
+                            var canzone = await ricercaTitolo(titolo);
+                        }catch(e){console.error(e);}
+                        bar.increment();
+                        return canzone;
+                    } )();
+                })
+            )).filter(a=>a)
+    bar.stop();*/
 
     return canzoni;
 }
 
-const trovaListaYT = async (videoId, listId)=>{
+const trovaListaYT = async (videoId, listId, interaction)=>{
     const ret = [];
     let pageToken;
+    const bar = new cliProgress.SingleBar(barStile('ricerca canzoni'), cliProgress.Presets.shades_classic);
+    updateDiscordBar(interaction,bar);
+
+    let primo = true;
     do {
         var hasNextPage = false;
         const res = await fetch(`https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&maxResults=5${pageToken?`&pageToken=${pageToken}`:''}&playlistId=${listId}&key=${youtubeKey}`);
 
         if (res.ok){
             const snippet = await res.json();
+            if (primo){
+                bar.start(snippet.pageInfo.totalResults,0);
+                primo=false;
+            }
 
             if (snippet.nextPageToken){
                 pageToken = snippet.nextPageToken;
@@ -303,6 +440,7 @@ const trovaListaYT = async (videoId, listId)=>{
                 throw new Error(errors.YouTubePlaylistNotFound);
             }
             ret.push(...items.map(item=>{
+                bar.increment();
                 return {
                     link: `https://www.youtube.com/watch?v=${item.snippet.resourceId.videoId}`,
                     titolo: item.snippet.title,
@@ -310,9 +448,10 @@ const trovaListaYT = async (videoId, listId)=>{
                 }
             }));
         }else{
-            throw new Error(errors.youTubeKeyExpired);
+            throw errors.YouTubeKeyExpired;
         }
     }while(hasNextPage);
+    bar.stop();
     return ret;
 }
 
@@ -325,19 +464,18 @@ const trovaCanzoneYT = async (videoId)=>{
         if (!item){
             throw new Error(errors.YouTubeVideoNotFound);
         }
-        console.log(item.snippet.title)
         return {
             link: `https://www.youtube.com/watch?v=${item.id}`,
             titolo: item.snippet.title,
             file: false
         };
     }else{
-        throw new Error(errors.youTubeKeyExpired);
+        throw errors.YouTubeKeyExpired;
     }
 }
 
 //deve ritornare un lista di canzoni
-const trovaCanzoni = async (song)=>{
+const trovaCanzoni = async (song, interaction)=>{
     if (song.match(/^https:\/\/youtu\.be\/.{11}$|^https:\/\/(www\.)?youtube\.com\/watch\?v=.{11}$/)){
         const match = song.match(/^https:\/\/youtu\.be\/(?<videoId>.{11})$|^https:\/\/(www\.)?youtube\.com\/watch\?v=(?<videoId2>.{11})$/);
         const videoId = match.groups.videoId || match.groups.videoId2;
@@ -349,13 +487,13 @@ const trovaCanzoni = async (song)=>{
         const match = song.match(/^https:\/\/(www\.)?youtube\.com\/watch\?v=(?<videoId>.{11})&list=(?<listId>.*)$|^https:\/\/(www\.)?youtube.com\/playlist\?list=(?<listId2>.{34})$/);
         const videoId = match.groups.videoId;
         const listId = match.groups.listId || match.groups.listId2;
-        return await trovaListaYT(videoId, listId);
+        return await trovaListaYT(videoId, listId, interaction);
     }
     if (song.match(/^https:\/\/open\.spotify\.com\/(track|album|artist|playlist)\/.{22}/)){
         const match = song.match(/https:\/\/open\.spotify\.com\/(?<resource>track|album|artist|playlist)\/(?<id>.{22})/);
         const id =  match.groups.id;
         const resource = match.groups.resource;
-        return await trovaLinkSpotify(id, resource);
+        return await trovaLinkSpotify(id, resource, interaction);
     }
     return [await ricercaTitolo(song)];
 }
@@ -380,7 +518,11 @@ const saluta = async (connection)=>{
     await finito;
 }
 
-const comando = async (song,position, member,channel)=>{
+const join = async () => {
+    
+}
+
+const comando = async (song,position, member,channel, interaction)=>{
     const sameVCError = requisiti.sameVoiceChannel(member);
     if (sameVCError)
         return sameVCError;
@@ -391,14 +533,16 @@ const comando = async (song,position, member,channel)=>{
 
     // cerca la canzone (o le canzoni) e ritorna un messaggio d'errore se non si trova nulla
     try {
-        var canzoni = await trovaCanzoni(song);
+        var canzoni = await trovaCanzoni(song, interaction);
+        for (let canzone of canzoni)
+            console.log(canzone.titolo);
     }catch(error){
         let errorMsg;
         switch (error){
             case errors.YouTubeVideoNotFound:
                 errorMsg = "The link you've provided doesn't seem to bring anywhere :o";
                 break;
-            case errors.youTubeKeyExpired:
+            case errors.YouTubeKeyExpired:
                 errorMsg = 'We ran out of youtube quotas ¯\_(:P)_/¯';
                 break;
             case errors.YouTubePlaylistNotFound:
@@ -409,6 +553,9 @@ const comando = async (song,position, member,channel)=>{
                 break;
             case errors.InvalidSpotifyId:
                 errorMsg = "The link you've provided seems to be malformed";
+                break;
+            case errors.YouTubeSearchNotFound:
+                errorMsg = "We couldn't find your song";
                 break;
             default:
                 throw error;
@@ -424,7 +571,6 @@ const comando = async (song,position, member,channel)=>{
             ]
         }
     }
-
 
     // se il bot non è in un canale vocale, entra e saluta
     let salutando;
@@ -512,7 +658,7 @@ module.exports = {
 
             await interaction.deferReply({ephemeral:false});
 
-            const response = await comando(song, position, interaction.member,interaction.channel);
+            const response = await comando(song, position, interaction.member,interaction.channel, interaction);
             response.ephemeral = true;
             return await interaction.editReply(response);
         },
