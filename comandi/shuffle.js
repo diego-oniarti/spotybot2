@@ -43,7 +43,7 @@ module.exports = {
 			return await message.channel.send(reply);
 		},
 
-		example: '`-ping`',
-		description: 'Replies with Pong!'
+		example: '`-shuffle`',
+		description: 'Shuffles the queue'
 	})
 }
