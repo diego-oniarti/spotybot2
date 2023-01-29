@@ -1,6 +1,5 @@
-const { SlashCommandBuilder, EmbedBuilder, discordSort, VoiceChannel } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const Discord = require('@discordjs/voice');
-const ytdl = require('ytdl-core');
 const Comando = require('../js/comando');
 const { Colori } = require('../js/colori');
 const fs = require('node:fs');
