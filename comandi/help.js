@@ -20,7 +20,7 @@ const esegui= async (comando)=>{
                     },
                     {
                         name: 'Commands',
-                        value: comandi.map(a=>{return ['`',a,'`'].join('')}).join(' ')
+                        value: comandi.map(a=>`\`${a}\``).join(' ')
                     }
                 )
                 .setColor(Colori.default)
@@ -40,6 +40,9 @@ const esegui= async (comando)=>{
     if (cmd.parameters)
         embed.addFields({name: 'parameters', value: cmd.parameters});
     embed.addFields({name: 'description', value: cmd.description});
+
+    if (cmd.aliases.length>1)
+        embed.addFields({name: 'aliases', value: cmd.aliases.slice(1).map(nome=>`\`${nome}\``).join(' ')});
 
     return {
         embeds:[embed],
