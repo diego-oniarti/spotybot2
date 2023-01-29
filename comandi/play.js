@@ -96,8 +96,22 @@ const erroreCanzone = (server,channel)=>{
 }
 
 // inizia a suonare
-const suona = async (server, channel) => {
+const suona = async (server, channel, member) => {
     let connection = Discord.getVoiceConnection(server.guild.id);
+    // se il bot non è in un canale vocale, entra e saluta
+    let salutando;
+    if (member){
+        const voiceChannel = member.voice.channel;
+
+        if (!connection){
+            connection = Discord.joinVoiceChannel({
+                channelId: voiceChannel.id,
+                guildId: member.guild.id,
+                adapterCreator: member.guild.voiceAdapterCreator
+            });
+            salutando = saluta(connection);
+        }
+    }
 
     const canzone = server.queue.shift();
     server.corrente = canzone;
@@ -117,6 +131,7 @@ const suona = async (server, channel) => {
 
     server.audioResource = resource;
 
+    await salutando; // tutta la parte precedente viene svolta durante il saluto
     player.play(resource);
     connection.subscribe(player);
     server.isPlaying=true;
@@ -325,11 +340,12 @@ const updateDiscordBar = (interaction,bar)=>{
                 embeds: [
                     new EmbedBuilder()
                     .setTitle('Looking for songs')
-                    .setDescription(`|${'\u2588'.repeat(Math.floor(bar.getProgress()*40))}${'\u2591'.repeat(Math.ceil((1-bar.getProgress())*40))}|`)
+                    //.setDescription(`|${'\u2588'.repeat(Math.floor(bar.getProgress()*40))}${'\u2591'.repeat(Math.ceil((1-bar.getProgress())*40))}|`)
+                    .setDescription(`[${'='.repeat(Math.floor(bar.getProgress()*40))}${'-'.repeat(Math.ceil((1-bar.getProgress())*40))}]`)
                     .setColor(Colori.default)
                 ]
             });
-        },2500)
+        },1750);
         bar.on('stop', ()=>{
             clearInterval(updater);
             ended=true;
@@ -528,8 +544,6 @@ const comando = async (song,position, member,channel, interaction)=>{
         return sameVCError;
 
     const guild = member.guild;
-    const voiceChannel = member.voice.channel;
-    let connection = Discord.getVoiceConnection(guild.id)
 
     // cerca la canzone (o le canzoni) e ritorna un messaggio d'errore se non si trova nulla
     try {
@@ -572,17 +586,6 @@ const comando = async (song,position, member,channel, interaction)=>{
         }
     }
 
-    // se il bot non è in un canale vocale, entra e saluta
-    let salutando;
-    if (!connection){
-        connection = Discord.joinVoiceChannel({
-            channelId: voiceChannel.id,
-            guildId: guild.id,
-            adapterCreator: guild.voiceAdapterCreator
-        });
-        salutando = saluta(connection);
-    }
-
     if (!servers.has(guild.id))
         servers.set(guild.id, new Server(guild));
     const server = servers.get(guild.id);
@@ -596,8 +599,7 @@ const comando = async (song,position, member,channel, interaction)=>{
 
     // se il server non sta suonando nulla, inizia a suonare, altrimenti accoda e basta
     if (!server.isPlaying){
-        await salutando;
-        await suona(server, channel);
+        await suona(server, channel,member);
     }
 
     if (canzoni.length == 1)
