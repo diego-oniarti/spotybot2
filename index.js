@@ -1,11 +1,10 @@
 // Require the necessary discord.js classes
-const fs = require('node:fs');
-const path = require('node:path');
 const { Client, Events, GatewayIntentBits, EmbedBuilder } = require('discord.js');
 const { Colori } = require('./js/colori');
 
 require('dotenv').config();
 const comandi = require('./js/comandi');
+const bottoni = require('./js/bottoni');
 
 // creazione del Bot
 const TOKEN = process.env.TOKEN;
@@ -37,7 +36,7 @@ const errorMsg = {
 
 // gestione degli Slash Commands
 client.on(Events.InteractionCreate, async interaction => {
-    if (!interaction.isChatInputCommand()) return;
+	if (!interaction.isChatInputCommand()) return;
     const command = client.commands.get(interaction.commandName);
 
 	if (!command) {
@@ -60,6 +59,23 @@ client.on(Events.InteractionCreate, async interaction => {
 		});
     });
 });
+
+client.on(Events.InteractionCreate, async interaction => {
+	if (!interaction.isButton()) return;
+	const bottone = bottoni.filter(bottone=>{return interaction.customId.match(bottone.id)})[0];
+	if (!bottone){
+		console.error(`No button matching ${interaction.customId} was found`);
+		return;
+	}
+
+	console.log(interaction.customId);
+
+	await bottone.handler(interaction)
+	.catch(error=>{
+		console.error(error);
+		interaction.reply(errorMsg);
+	});
+})
 
 // gestione dei comandi normali
 client.on(Events.MessageCreate, async message => {
