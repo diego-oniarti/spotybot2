@@ -1,25 +1,34 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require('discord.js');
 const { Colori } = require('../js/colori');
 const Comando = require('../js/comando');
 const requisiti = require('../js/requisiti')
 const {servers} =  require('../shared')
 
-const comando= (guild) =>{
+const comando= (guild, pagina=0) =>{
     const playingError = requisiti.playing(guild);
     if (playingError)
         return playingError;
 
     const server = servers.get(guild.id);
+	if (server.queue.length == 0)
+		return {
+			embeds: [
+				new EmbedBuilder()
+				.setTitle('Queue is empty')
+				.setColor(Colori.default)
+			]
+		}
+
 	return {
 		embeds: [
 			new EmbedBuilder()
 			.setTitle("Queue")
-            .setDescription(server.queue.slice(0,20).map((song,index)=>{
-                return `\`${index}\` __[${song.titolo}](${song.link})__`; 
-            }).join())
+            .setDescription(server.queue.slice(pagina*20, (pagina+1)*20).map((song,index)=>{
+                return `\`${index+1+pagina*20}\` __[${song.titolo}](${song.link})__`; 
+            }).join('\n'))
             .addFields({
                 name: 'Currently playing',
-                value: `__[${server.corrrente.titolo}](${server.corrente.link})__`,
+                value: `__[${server.corrente.titolo}](${server.corrente.link})__`,
                 inline:  true
             },
             {
@@ -29,9 +38,33 @@ const comando= (guild) =>{
             })
 			.setColor(Colori.default)
 		],
+		components: [
+			new ActionRowBuilder()
+			.addComponents(
+				new ButtonBuilder()
+				.setDisabled(pagina<=0)
+				.setCustomId(`queueIndietro-${pagina-1}`)
+				.setEmoji('⬅️')
+				.setStyle(ButtonStyle.Primary),
+				
+				new ButtonBuilder()
+				.setDisabled((pagina+1)*20>=server.queue.length)
+				.setCustomId(`queueAvanti-${pagina+1}`)
+				.setEmoji('➡️')
+				.setStyle(ButtonStyle.Primary)
+			)
+		],
 		ephemeral: true
 	}
 }
+
+bottone = async (i)=>{
+	console.log(i);
+	i.reply({
+		content:"ciao",
+		ephemeral: true
+	});
+};
 
 module.exports = { 
 	comando: new Comando({
@@ -41,19 +74,20 @@ module.exports = {
 			.setDescriptionLocalizations({
 				it: 'Mostra la coda'
 			}),
-		execute: async () => {
-			const reply = comando();
-			return await interaction.reply(reply);
+		execute: async (interaction) => {
+			const reply = comando(interaction.guild);
+			const messaggio =  await interaction.reply(reply);
 		},
 
 		aliases: ['queue', 'q'],
 
 		executeMsg: async (message) => {
-			const reply = comando();
-			message.channel.send(reply);
+			const reply = comando(message.guild);
+			return await message.channel.send(reply);
 		},
 
 		example: '`-queue`',
 		description: 'Shows you the queue'
-	})
+	}),
+	comandoQueue: comando
 }
