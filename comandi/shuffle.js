@@ -13,7 +13,7 @@ const comando=(member)=>{
         return playingError;
 
     const server = servers.get(member.guild.id);
-    server.queue.sort((a,b)=>{return 0.5-Math.random()});
+    server.queue = server.queue.sort((a,b)=>{return 0.5-Math.random()});
     return {
         embeds: [
             new EmbedBuilder()
