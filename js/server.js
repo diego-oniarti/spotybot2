@@ -14,6 +14,8 @@ class Server {
         this.radioTrack2=undefined;
         this.isPlaying=false;
 
+        this.audioResource = undefined;
+
         this.corrente = undefined;
         this.pastSongs = [];
     }
