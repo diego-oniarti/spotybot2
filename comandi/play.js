@@ -126,7 +126,8 @@ const suona = async (server, channel, member) => {
 
     const player = Discord.createAudioPlayer();
     const resource = Discord.createAudioResource(stream.stream, {
-        inputType: stream.type
+        inputType: stream.type,
+        inlineVolume: true
     });
 
     server.audioResource = resource;

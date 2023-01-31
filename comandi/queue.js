@@ -5,6 +5,7 @@ const requisiti = require('../js/requisiti')
 const {servers} =  require('../shared')
 
 const comando= (guild, pagina=0) =>{
+	pagina = parseInt(pagina);
     const playingError = requisiti.playing(guild);
     if (playingError)
         return playingError;
