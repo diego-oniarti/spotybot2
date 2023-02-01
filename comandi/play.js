@@ -329,8 +329,19 @@ const spotifyPlaylist = async (id) =>{
     return titoli;
 }
 
-const updateDiscordBar = (emitter,bar)=>{
-    const updater = setInterval(()=>{
+const updateDiscordBar = async (emitter,bar)=>{
+    let stop = false;
+    await emitter.emit('msg', {
+        embeds: [
+        new EmbedBuilder()
+            .setTitle('Looking for songs')
+            .setDescription(`|${'\u2588'.repeat(Math.floor(bar.getProgress()*40))}${'\u2591'.repeat(Math.ceil((1-bar.getProgress())*40))}|`)
+            //.setDescription(`[${'='.repeat(Math.floor(bar.getProgress()*40))}${'-'.repeat(Math.ceil((1-bar.getProgress())*40))}]`)
+            .setColor(Colori.default)
+        ]
+    });
+    emitter.on('hasSent',()=>{
+        if (stop) return;
         emitter.emit('msg', {
             embeds: [
             new EmbedBuilder()
@@ -340,9 +351,9 @@ const updateDiscordBar = (emitter,bar)=>{
                 .setColor(Colori.default)
             ]
         });
-    },1750);
+    });
     bar.on('stop', ()=>{
-        clearInterval(updater);
+        stop=true;
     });
 }
 
@@ -430,9 +441,10 @@ const trovaListaYT = async (videoId, listId, server,position,emitter)=>{
     const bar = new cliProgress.SingleBar(barStile('ricerca canzoni'), cliProgress.Presets.shades_classic);
     updateDiscordBar(emitter,bar);
 
-    fetch('https://www.googleapis.com/youtube/v3/playlists?'+querystring.stringify({
+    await fetch('https://www.googleapis.com/youtube/v3/playlists?'+querystring.stringify({
         part: 'snippet',
-        id: listId
+        id: listId,
+        key: youtubeKey
     }))
     .then(res=>res.json())
     .then(data=>{
@@ -683,9 +695,10 @@ module.exports = {
             await interaction.deferReply({ephemeral:false});
 
             const emitter = new EventEmitter();
-            emitter.on('msg', (msg)=>{
-                interaction.editReply(msg);
-            })
+            emitter.on('msg', async (msg)=>{
+                await interaction.editReply(msg);
+                emitter.emit('hasSent');
+            });
             const response = await comando(song, position, interaction.member,interaction.channel, emitter);
             return await interaction.editReply(response);
         },
@@ -708,8 +721,9 @@ module.exports = {
                 ]
             });
             const emitter = new EventEmitter();
-            emitter.on('msg',(msg)=>{
-                messaggio.edit(msg);
+            emitter.on('msg', async (msg)=>{
+                await messaggio.edit(msg);
+                emitter.emit('hasSent');
             });
             const response = await comando(canzone, undefined, message.member,message.channel, emitter);
             
