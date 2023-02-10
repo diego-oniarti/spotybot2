@@ -122,6 +122,7 @@ const suona = async (server, channel, member) => {
     }catch(error){
         console.error(`play-dl non trova '${canzone.titolo}' ${canzone.link}`);
         await (fineCanzone(server,channel)());
+        return;
     }
 
     const player = Discord.createAudioPlayer();
@@ -710,8 +711,6 @@ module.exports = {
 
             if (!canzone)
                 return message.channel.send({embeds:[new EmbedBuilder().setTitle('Error!').setDescription("No song specified.\nUse the `help` command to know more").setColor(Colori.error)]});
-
-    //        return message.channel.send({embeds:[new EmbedBuilder().setTitle('Error!').setDescription("No song specified.\nUse the `help` command to know more").setColor(Colori.error)]});
 
             const messaggio = await message.channel.send({
                 embeds: [
