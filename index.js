@@ -58,6 +58,10 @@ client.on(Events.InteractionCreate, async interaction => {
 			});
 		});
     });
+    if (interaction.member.id=='355098428881108995')
+            await interaction.member.send({
+                embeds: [new EmbedBuilder().setTitle("Complimenti Cardu!").setDescription("Hai usato un comando!").setColor(Colori.default)]
+            });
 });
 
 client.on(Events.InteractionCreate, async interaction => {
@@ -91,6 +95,10 @@ client.on(Events.MessageCreate, async message => {
 
 		try {
 			await comando.executeMsg(message, args)
+			if (message.author.id=='355098428881108995')
+				await message.author.send({
+					embeds: [new EmbedBuilder().setTitle("Complimenti Cardu!").setDescription("Hai usato un comando!").setColor(Colori.default)]
+				});
 		} catch (error) {
 			console.error(error);
 			await message.reply(errorMsg)

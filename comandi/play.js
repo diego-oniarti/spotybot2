@@ -3,6 +3,7 @@ const Discord = require('@discordjs/voice');
 const Comando = require('../js/comando');
 const { Colori } = require('../js/colori');
 const fs = require('node:fs');
+const ytdl = require('ytdl-core');
 const path = require('node:path');
 const fetch = require('node-fetch');
 require('dotenv').config();
@@ -13,6 +14,7 @@ const querystring = require('node:querystring');
 const play = require('play-dl');
 const requisiti = require('../js/requisiti');
 const EventEmitter = require('node:events');
+const ffmpeg = require('fluent-ffmpeg');
 
 const barStile = (nome)=>{
     if (nome)
@@ -117,21 +119,89 @@ const suona = async (server, channel, member) => {
     server.corrente = canzone;
 
     //const stream = ytdl(canzone.link, {filter:'audioonly'});
-    try{
-        var stream = await play.stream(canzone.link);
-    }catch(error){
-        console.error(`play-dl non trova '${canzone.titolo}' ${canzone.link}`);
+    await new Promise(resolve=>{
+        ytdl(canzone.link, {
+            filter:'audioonly',
+            format: 'mp3',
+        })
+        .pipe(fs.createWriteStream('./video.mp3'))
+        .on('close', resolve)
+    });
+
+    const command = ffmpeg('./video.mp3');
+    const duration = await new Promise((resolve, reject) => {
+        command.ffprobe((err, data) => {
+        if (err) {
+            reject(err);
+        } else {
+            resolve(Math.ceil(data.format.duration));
+        }
+        });
+    });
+
+    if (duration>=1800) {
         await (fineCanzone(server,channel)());
+        channel.send({embeds: [
+            new EmbedBuilder()
+            .setTitle("ERROR!")
+            .setColor(Colori.error)
+            .setDescription("Song was too long")
+        ]});
         return;
     }
 
-    const player = Discord.createAudioPlayer();
-    const resource = Discord.createAudioResource(stream.stream, {
-        inputType: stream.type,
-        inlineVolume: true
-    });
+    const outputDir = './segments';
 
-    server.audioResource = resource;
+    const oldFiles = fs.readdirSync(outputDir);
+    for (let file of oldFiles) {
+        const filePath = path.join(outputDir, file);
+        fs.rmSync(filePath);
+    }
+
+    const outputNamePrefix = 'segment';
+    const outputExt = '.mp3';
+    const chunkDuration = 58;
+    
+    const numChunks = Math.ceil(duration / chunkDuration);
+    
+    server.chunks = [];
+
+    for (let i = 0; i < numChunks; i++) {
+        const startTime = i * chunkDuration;
+        const endTime = Math.min(duration, (i+1)*chunkDuration);
+        const thisChunkDuration = endTime-startTime;
+
+        const outputName = `${outputDir}/${outputNamePrefix}-${i + 1}${outputExt}`;
+        server.chunks.push(outputName);
+        
+        await new Promise((resolve, reject) => {
+        new ffmpeg('./video.mp3')
+            .setStartTime(startTime)
+            .setDuration(thisChunkDuration)
+            .output(outputName)
+            .on('end', resolve)
+            .on('error', reject)
+            .run();
+        });
+    }
+    
+    
+    const resource = Discord.createAudioResource(server.chunks.shift(), {
+        inlineVolume: true,
+    });
+    if (server.chunks.length>0)
+        server.nextChunk = Discord.createAudioResource(server.chunks.shift(), {
+            inlineVolume: true,
+        });
+    else {
+        server.nextChunk = undefined;
+    }
+
+    let player = Discord.createAudioPlayer({
+        behaviors: {
+            noSubscriber: Discord.NoSubscriberBehavior.Play,
+        }
+    });
 
     await salutando; // tutta la parte precedente viene svolta durante il saluto
     player.play(resource);
@@ -150,12 +220,36 @@ const suona = async (server, channel, member) => {
         console.error(error);
     }
 
-    player.on(Discord.AudioPlayerStatus.Idle,
-        fineCanzone(server,channel)
-    );
-    player.on('error',
-        erroreCanzone(server,channel)
-    );
+    const networkStateChangeHandler = (oldNetworkState, newNetworkState) => {
+        const newUdp = Reflect.get(newNetworkState, 'udp');
+        clearInterval(newUdp?.keepAliveInterval);
+    }
+
+    player.on('stateChange', (oldState, newState)=>{
+        Reflect.get(oldState, 'networking')?.off('stateChange', networkStateChangeHandler);
+        Reflect.get(newState, 'networking')?.on('stateChange', networkStateChangeHandler);
+    });
+
+    player.on(Discord.AudioPlayerStatus.Idle, (a)=>{
+        if (server.nextChunk) {
+            player.play(server.nextChunk);
+        }else{
+            return fineCanzone(server,channel)();
+        }
+
+        if (server.chunks.length>0) {
+            server.nextChunk = Discord.createAudioResource(server.chunks.shift(), {
+                inlineVolume: true,
+            });
+        }else{
+            server.nextChunk = undefined;
+        }
+    });
+    player.on('error',(err)=>{
+        console.log("ERROR")
+        console.log(err);
+        erroreCanzone(server,channel)();
+    });
 }
 
 /*questi metodi devono ritornare una canzone o lista di oggetti Canzone*/
