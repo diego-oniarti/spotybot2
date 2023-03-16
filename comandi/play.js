@@ -153,9 +153,13 @@ const suona = async (server, channel, member) => {
     const outputDir = './segments';
 
     const oldFiles = fs.readdirSync(outputDir);
-    for (let file of oldFiles) {
-        const filePath = path.join(outputDir, file);
-        fs.rmSync(filePath);
+    for (let i=0; i<oldFiles.length; ++i){
+        const filePath = path.join(outputDir, oldFiles[i]);
+        try {
+            fs.unlinkSync(filePath);
+        }catch(e) {
+            //--i;
+        }
     }
 
     const outputNamePrefix = 'segment';
