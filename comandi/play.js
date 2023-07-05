@@ -3,7 +3,6 @@ const Discord = require('@discordjs/voice');
 const Comando = require('../js/comando');
 const { Colori } = require('../js/colori');
 const fs = require('node:fs');
-const ytdl = require('ytdl-core');
 const path = require('node:path');
 const fetch = require('node-fetch');
 require('dotenv').config();
@@ -11,10 +10,9 @@ const { servers } = require('../shared');
 const { Server } = require('../js/server');
 const cliProgress = require('cli-progress');
 const querystring = require('node:querystring');
-const play = require('play-dl');
 const requisiti = require('../js/requisiti');
 const EventEmitter = require('node:events');
-const ffmpeg = require('fluent-ffmpeg');
+const ytdl = require('ytdl-core');
 
 const barStile = (nome)=>{
     if (nome)
@@ -117,6 +115,8 @@ const suona = async (server, channel, member) => {
 
     const canzone = server.queue.shift();
     server.corrente = canzone;
+    fs.mkdir(path.join(__dirname, '..', 'canzoni'), {recursive: true}, (e)=>{if (e) console.error(e);});
+    const nomeFile = path.join(__dirname, '..', 'canzoni', `${channel.guildId}.mp3`);
 
     //const stream = ytdl(canzone.link, {filter:'audioonly'});
     await new Promise(resolve=>{
@@ -124,82 +124,13 @@ const suona = async (server, channel, member) => {
             filter:'audioonly',
             format: 'mp3',
         })
-        .pipe(fs.createWriteStream('./video.mp3'))
+        .pipe(fs.createWriteStream(nomeFile))
         .on('close', resolve)
     });
-
-    const command = ffmpeg('./video.mp3');
-    const duration = await new Promise((resolve, reject) => {
-        command.ffprobe((err, data) => {
-        if (err) {
-            reject(err);
-        } else {
-            resolve(Math.ceil(data.format.duration));
-        }
-        });
-    });
-
-    if (duration>=1800) {
-        await (fineCanzone(server,channel)());
-        channel.send({embeds: [
-            new EmbedBuilder()
-            .setTitle("ERROR!")
-            .setColor(Colori.error)
-            .setDescription("Song was too long")
-        ]});
-        return;
-    }
-
-    const outputDir = './segments';
-
-    const oldFiles = fs.readdirSync(outputDir);
-    for (let i=0; i<oldFiles.length; ++i){
-        const filePath = path.join(outputDir, oldFiles[i]);
-        try {
-            fs.unlinkSync(filePath);
-        }catch(e) {
-            //--i;
-        }
-    }
-
-    const outputNamePrefix = 'segment';
-    const outputExt = '.mp3';
-    const chunkDuration = 58;
     
-    const numChunks = Math.ceil(duration / chunkDuration);
-    
-    server.chunks = [];
-
-    for (let i = 0; i < numChunks; i++) {
-        const startTime = i * chunkDuration;
-        const endTime = Math.min(duration, (i+1)*chunkDuration);
-        const thisChunkDuration = endTime-startTime;
-
-        const outputName = `${outputDir}/${outputNamePrefix}-${i + 1}${outputExt}`;
-        server.chunks.push(outputName);
-        
-        await new Promise((resolve, reject) => {
-        new ffmpeg('./video.mp3')
-            .setStartTime(startTime)
-            .setDuration(thisChunkDuration)
-            .output(outputName)
-            .on('end', resolve)
-            .on('error', reject)
-            .run();
-        });
-    }
-    
-    
-    const resource = Discord.createAudioResource(server.chunks.shift(), {
+    const resource = Discord.createAudioResource(nomeFile, {
         inlineVolume: true,
     });
-    if (server.chunks.length>0)
-        server.nextChunk = Discord.createAudioResource(server.chunks.shift(), {
-            inlineVolume: true,
-        });
-    else {
-        server.nextChunk = undefined;
-    }
 
     let player = Discord.createAudioPlayer({
         behaviors: {
