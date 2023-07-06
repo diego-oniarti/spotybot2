@@ -117,6 +117,8 @@ const suona = async (server, channel, member) => {
     server.corrente = canzone;
     fs.mkdir(path.join(__dirname, '..', 'canzoni'), {recursive: true}, (e)=>{if (e) console.error(e);});
     const nomeFile = path.join(__dirname, '..', 'canzoni', `${channel.guildId}.mp3`);
+    if (fs.existsSync(nomeFile)) 
+        fs.rmSync(nomeFile);
 
     //const stream = ytdl(canzone.link, {filter:'audioonly'});
     await new Promise(resolve=>{
