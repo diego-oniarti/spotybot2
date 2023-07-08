@@ -125,6 +125,12 @@ const suona = async (server, channel, member) => {
         ytdl(canzone.link, {
             filter:'audioonly',
             format: 'mp3',
+            quality: 'highestaudio',
+            requestOptions: {
+                headers: {
+                    cookie: ""
+                }
+            }
         })
         .pipe(fs.createWriteStream(nomeFile))
         .on('close', resolve)
