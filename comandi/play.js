@@ -121,20 +121,29 @@ const suona = async (server, channel, member) => {
         fs.rmSync(nomeFile);
 
     //const stream = ytdl(canzone.link, {filter:'audioonly'});
-    await new Promise(resolve=>{
-        ytdl(canzone.link, {
-            filter:'audioonly',
-            format: 'mp3',
-            quality: 'highestaudio',
-            requestOptions: {
-                headers: {
-                    cookie: ""
+    let tentativi = 0;
+    do {
+        await new Promise(resolve=>{
+            ytdl(canzone.link, {
+                filter:'audioonly',
+                format: 'mp3',
+                quality: 'highestaudio',
+                requestOptions: {
+                    headers: {
+                        cookie: ""
+                    }
                 }
-            }
-        })
-        .pipe(fs.createWriteStream(nomeFile))
-        .on('close', resolve)
-    });
+            })
+            .pipe(fs.createWriteStream(nomeFile))
+            .on('close', resolve)
+            .on('end', resolve)
+        });
+        tentativi++;
+    } while (fs.statSync(nomeFile).size==0 && tentativi<5);
+    if (tentativi == 5) {
+        console.error("Errore nel download file");
+        console.error(canzone);
+    }
     
     const resource = Discord.createAudioResource(nomeFile, {
         inlineVolume: true,
