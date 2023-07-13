@@ -121,8 +121,13 @@ const suona = async (server, channel, member) => {
         fs.rmSync(nomeFile);
 
     //const stream = ytdl(canzone.link, {filter:'audioonly'});
+    let songdied = false;
     await new Promise(resolve=>{
-        ytdl(canzone.link, {
+        const dead = setTimeout(()=>{
+            songdied=true;
+            resolve();
+        }, 5000);
+        const stream = ytdl(canzone.link, {
             filter:'audioonly',
             format: 'mp3',
             quality: 'highestaudio',
@@ -132,10 +137,17 @@ const suona = async (server, channel, member) => {
                 }
             }
         })
-        .once('data', resolve)
+        .once('data', ()=>{
+            clearTimeout(dead);
+        })
         .pipe(fs.createWriteStream(nomeFile))
+        .on('close', resolve)
     });
-    const resource = Discord.createAudioResource(fs.createReadStream(nomeFile), {
+    if (songdied) {
+        fineCanzone(server,channel)()
+        return;
+    }
+    const resource = Discord.createAudioResource(nomeFile, {
         inlineVolume: true,
     });
 
