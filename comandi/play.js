@@ -124,7 +124,8 @@ const suona = async (server, channel, member) => {
     let tentativi = 0;
     do {
         await new Promise(resolve=>{
-            ytdl(canzone.link, {
+            let timeoutId;
+            stream = ytdl(canzone.link, {
                 filter:'audioonly',
                 format: 'mp3',
                 quality: 'highestaudio',
@@ -135,11 +136,18 @@ const suona = async (server, channel, member) => {
                 }
             })
             .pipe(fs.createWriteStream(nomeFile))
-            .on('close', resolve)
-            .on('end', resolve)
+            .on('close', ()=>{
+                clearTimeout(timeoutId);
+                resolve()
+            });
+            timeoutId = setTimeout(()=>{
+                stream.destroy();
+                resolve();
+            }, 2000);
         });
         tentativi++;
     } while (fs.statSync(nomeFile).size==0 && tentativi<5);
+    if (tentativi>1) console.error(`Download ${canzone.titolo} | ${tentativi-1} tentativi`);
     if (tentativi == 5) {
         console.error("Errore nel download file");
         console.error(canzone);
@@ -183,19 +191,7 @@ const suona = async (server, channel, member) => {
     });
 
     player.on(Discord.AudioPlayerStatus.Idle, (a)=>{
-        if (server.nextChunk) {
-            player.play(server.nextChunk);
-        }else{
-            return fineCanzone(server,channel)();
-        }
-
-        if (server.chunks.length>0) {
-            server.nextChunk = Discord.createAudioResource(server.chunks.shift(), {
-                inlineVolume: true,
-            });
-        }else{
-            server.nextChunk = undefined;
-        }
+        fineCanzone(server,channel)();
     });
     player.on('error',(err)=>{
         console.log("ERROR")
