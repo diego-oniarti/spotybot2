@@ -124,7 +124,6 @@ const suona = async (server, channel, member) => {
     let tentativi = 0;
     do {
         await new Promise(resolve=>{
-            let timeoutId;
             stream = ytdl(canzone.link, {
                 filter:'audioonly',
                 format: 'mp3',
@@ -137,13 +136,8 @@ const suona = async (server, channel, member) => {
             })
             .pipe(fs.createWriteStream(nomeFile))
             .on('close', ()=>{
-                clearTimeout(timeoutId);
                 resolve()
             });
-            timeoutId = setTimeout(()=>{
-                stream.destroy();
-                resolve();
-            }, 2000);
         });
         tentativi++;
     } while (fs.statSync(nomeFile).size==0 && tentativi<5);
