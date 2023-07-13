@@ -198,6 +198,7 @@ const suona = async (server, channel, member) => {
 /* canzone: {link, titolo, file} */
 
 const ricercaTitolo = async (song, server,position,emitter, suonare=true)=>{
+    start = performance.now();
     try{
         var pagina = await fetch(encodeURI(`https://www.youtube.com/results?search_query=${song}`));
     }catch(error){
@@ -211,7 +212,9 @@ const ricercaTitolo = async (song, server,position,emitter, suonare=true)=>{
         console.error(error);
         throw errors.YouTubeTitleNotFound;
     }
-    
+    console.log(`Time to fetch: ${(performance.now()-start)/1000} ms`);
+
+    start = performance.now();
     const match = html.match(/\"videoId\"\:\"(.{1,12})\"/);
     if (match)
         token = match[1];
@@ -221,6 +224,7 @@ const ricercaTitolo = async (song, server,position,emitter, suonare=true)=>{
     }
     if (!token)
         throw errors.YouTubeTitleNotFound;
+    console.log(`Time to match: ${(performance.now()-start)/1000} ms`);
 
     const canzone = trovaCanzoneYT(token, server,position,emitter, suonare);
     return canzone;
