@@ -123,10 +123,7 @@ const suona = async (server, channel, member) => {
     //const stream = ytdl(canzone.link, {filter:'audioonly'});
     let songdied = false;
     await new Promise(resolve=>{
-        const dead = setTimeout(()=>{
-            songdied=true;
-            resolve();
-        }, 5000);
+        let dead;
         const stream = ytdl(canzone.link, {
             filter:'audioonly',
             format: 'mp3',
@@ -142,6 +139,11 @@ const suona = async (server, channel, member) => {
         })
         .pipe(fs.createWriteStream(nomeFile))
         .on('close', resolve)
+        dead = setTimeout(()=>{
+            songdied=true;
+            resolve();
+            stream.destroy();
+        }, 5000);
     });
     if (songdied) {
         fineCanzone(server,channel)()
