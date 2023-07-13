@@ -121,33 +121,21 @@ const suona = async (server, channel, member) => {
         fs.rmSync(nomeFile);
 
     //const stream = ytdl(canzone.link, {filter:'audioonly'});
-    let tentativi = 0;
-    do {
-        await new Promise(resolve=>{
-            stream = ytdl(canzone.link, {
-                filter:'audioonly',
-                format: 'mp3',
-                quality: 'highestaudio',
-                requestOptions: {
-                    headers: {
-                        cookie: ""
-                    }
+    await new Promise(resolve=>{
+        ytdl(canzone.link, {
+            filter:'audioonly',
+            format: 'mp3',
+            quality: 'highestaudio',
+            requestOptions: {
+                headers: {
+                    cookie: ""
                 }
-            })
-            .pipe(fs.createWriteStream(nomeFile))
-            .on('close', ()=>{
-                resolve()
-            });
-        });
-        tentativi++;
-    } while (fs.statSync(nomeFile).size==0 && tentativi<5);
-    if (tentativi>1) console.error(`Download ${canzone.titolo} | ${tentativi-1} tentativi`);
-    if (tentativi == 5) {
-        console.error("Errore nel download file");
-        console.error(canzone);
-    }
-    
-    const resource = Discord.createAudioResource(nomeFile, {
+            }
+        })
+        .once('data', resolve)
+        .pipe(fs.createWriteStream(nomeFile))
+    });
+    const resource = Discord.createAudioResource(fs.createReadStream(nomeFile), {
         inlineVolume: true,
     });
 
@@ -198,7 +186,6 @@ const suona = async (server, channel, member) => {
 /* canzone: {link, titolo, file} */
 
 const ricercaTitolo = async (song, server,position,emitter, suonare=true)=>{
-    start = performance.now();
     try{
         var pagina = await fetch(encodeURI(`https://www.youtube.com/results?search_query=${song}`));
     }catch(error){
@@ -212,9 +199,7 @@ const ricercaTitolo = async (song, server,position,emitter, suonare=true)=>{
         console.error(error);
         throw errors.YouTubeTitleNotFound;
     }
-    console.log(`Time to fetch: ${(performance.now()-start)/1000} ms`);
 
-    start = performance.now();
     const match = html.match(/\"videoId\"\:\"(.{1,12})\"/);
     if (match)
         token = match[1];
@@ -224,7 +209,6 @@ const ricercaTitolo = async (song, server,position,emitter, suonare=true)=>{
     }
     if (!token)
         throw errors.YouTubeTitleNotFound;
-    console.log(`Time to match: ${(performance.now()-start)/1000} ms`);
 
     const canzone = trovaCanzoneYT(token, server,position,emitter, suonare);
     return canzone;
