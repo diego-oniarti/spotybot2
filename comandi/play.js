@@ -161,6 +161,8 @@ const suona = async (server, channel, member) => {
         }
     });
 
+    server.audioPlayer = player;
+
     await salutando; // tutta la parte precedente viene svolta durante il saluto
     player.play(resource);
     connection.subscribe(player);
