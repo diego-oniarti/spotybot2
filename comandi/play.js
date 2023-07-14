@@ -153,6 +153,8 @@ const suona = async (server, channel, member) => {
         inlineVolume: true,
     });
 
+    server.audioResource = resource;
+
     let player = Discord.createAudioPlayer({
         behaviors: {
             noSubscriber: Discord.NoSubscriberBehavior.Play,

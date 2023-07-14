@@ -46,8 +46,8 @@ module.exports = {
                 .setRequired(true)
         ),
         execute: async(interaction) => {
-            const volume = interaction.options.getInteger("delay");
-
+            const volume = interaction.options.getInteger("volume");
+            await interaction.deferReply({ephemeral:false});
             const reply = await esegui(volume, interaction.member);
             return await interaction.editReply(reply);
         },
