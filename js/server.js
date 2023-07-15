@@ -1,15 +1,16 @@
 const Modes = {
-    linear: 0,
-    loopSong: 1,
-    loopQueue: 2,
-    radio: 3
+    none: 1,
+    loopSong: 2,
+    loopQueue: 3,
+    radio: 4,
+    loopQueueFromNow: 5
 }
 
 class Server {
     constructor(guild){
         this.guild = guild;
         this.queue = [];
-        this.mode = Modes.linear;
+        this.mode = Modes.none;
         this.radioTrack1=undefined;
         this.radioTrack2=undefined;
         this.isPlaying=false;

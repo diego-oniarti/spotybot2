@@ -7,7 +7,7 @@ const path = require('node:path');
 const fetch = require('node-fetch');
 require('dotenv').config();
 const { servers } = require('../shared');
-const { Server } = require('../js/server');
+const { Server, Modes } = require('../js/server');
 const cliProgress = require('cli-progress');
 const querystring = require('node:querystring');
 const requisiti = require('../js/requisiti');
@@ -63,27 +63,59 @@ const getSpotifyToken = async ()=>{
 const fineCanzone = (server,channel)=>{
     return async ()=>{
         // aggiunge la canzone appena finita alle pastSongs
-        if (server.corrente)
-            server.pastSongs.push(server.corrente);
+        if (server.corrente){
+            switch (server.mode) {
+                case Modes.none:
+                case Modes.loopQueue:
+                    server.pastSongs.push(server.corrente);
+                    break;
+                case Modes.loopQueueFromNow:
+                    server.queue.push(server.corrente);
+                    break;
+                case Modes.loopSong:
+                    server.queue.unshift(server.corrente);
+                    break;
+                    
+            }
+        }
         server.audioResource = null;
 
         const connection = Discord.getVoiceConnection(server.guild.id);
         const voiceChannelId = connection.joinConfig.channelId;
         const voiceChannel = await server.guild.channels.fetch(voiceChannelId);
 
-        if (server.queue.length>0 && voiceChannel.members.size>1){
-            suona(server,channel);
-        } else {
-            server.isPlaying=false;
-            server.audioResource = undefined;
-            server.pastSongs.push(...server.queue);
-
-            if (connection)
-                connection.destroy();
-            server.timeout = setTimeout(()=>{
-                servers.delete(server.guild.id);
-            },60000)
+        if (voiceChannel.members.size>1) {
+            switch (server.mode) {
+                case Modes.loopQueue:
+                    if (server.queue.length==0) {
+                        server.queue = server.pastSongs;
+                        server.pastSongs = [];
+                    }
+                    suona(server,channel);
+                    return;
+                case Modes.loopQueueFromNow:
+                case Modes.loopSong:
+                    suona(server,channel);
+                    return;
+                case Modes.none:
+                    if (server.queue.length > 0) {
+                        suona(server,channel);
+                    }
+                    break;
+            }
         }
+
+        // lascia il canale
+        server.isPlaying=false;
+        server.audioResource = undefined;
+        server.pastSongs.push(...server.queue);
+        server.mode = Modes.none;
+
+        if (connection)
+            connection.destroy();
+        server.timeout = setTimeout(()=>{
+            servers.delete(server.guild.id);
+        },60000)
     }
 }
 
@@ -442,8 +474,9 @@ const trovaLinkSpotify = async(id, resource, server,position,emitter)=>{
     }
 
     const titoliBatch = [];
-    for (i=0; i<titoli.length; i+=50){
-        titoliBatch.push(titoli.slice(i, i+50));
+    const NB = 10;
+    for (i=0; i<titoli.length; i+=NB){
+        titoliBatch.push(titoli.slice(i, i+NB));
     }
 
     const canzoni = [];
