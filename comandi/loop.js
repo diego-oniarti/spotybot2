@@ -41,6 +41,13 @@ module.exports = {
             .addStringOption(option=>
                 option
                 .setName('mode')
+                .setNameLocalizations({
+                    it: "modalità"
+                })
+                .setDescription('loop mode')
+                .setDescriptionLocalizations({
+                    it: "modalità di loop"
+                })
                 .setChoices(
                     {name: "queue", value: "queue"},
                     {name: "song", value: "song"},
