@@ -39,8 +39,9 @@ module.exports = {
 				it: 'Mette la coda o una canzone in loop'
 			})
             .addStringOption(option=>
-                option.setName('mode')
-                .option.setChoices(
+                option
+                .setName('mode')
+                .setChoices(
                     {name: "queue", value: "queue"},
                     {name: "song", value: "song"},
                     {name: "none", value: "none"},
