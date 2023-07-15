@@ -58,7 +58,7 @@ client.on(Events.InteractionCreate, async interaction => {
 			});
 		});
     });
-    if (interaction.member.id=='355098428881108995')
+    if (interaction.member?.id=='355098428881108995')
             await interaction.member.send({
                 embeds: [new EmbedBuilder().setTitle("Complimenti Cardu!").setDescription("Hai usato un comando!").setColor(Colori.default)]
             });

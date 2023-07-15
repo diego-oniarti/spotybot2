@@ -15,10 +15,10 @@ const comando=(membro, mode)=>{
     const oldMode = server.mode;
 
     if (!mode) {
-        if (oldMode === Modes.none) mode = Modes.loopSong;
-        else mode = Modes.none
+        if (oldMode === Modes.none) mode = "song";
+        else mode = "none"
     }
-    server.mode = mode;
+    server.mode = ([Modes.loopQueue, Modes.loopQueueFromNow, Modes.loopSong, Modes.none])[["queue","queueFromNow","song","none"].indexOf(mode)];
 
     return {
 		embeds: [
@@ -59,7 +59,7 @@ module.exports = {
             const mode = interaction.options.getString("mode");
 
             const reply = comando(membro, mode);
-			return await interaction.channel.send(reply);
+			return await interaction.reply(reply);
 		},
 
 		aliases: ['loop'],
