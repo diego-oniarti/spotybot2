@@ -81,27 +81,29 @@ const fineCanzone = (server,channel)=>{
         server.audioResource = null;
 
         const connection = Discord.getVoiceConnection(server.guild.id);
-        const voiceChannelId = connection.joinConfig.channelId;
-        const voiceChannel = await server.guild.channels.fetch(voiceChannelId);
+        if (!connection) {
+            const voiceChannelId = connection.joinConfig.channelId;
+            const voiceChannel = await server.guild.channels.fetch(voiceChannelId);
 
-        if (voiceChannel.members.size>1) {
-            switch (server.mode) {
-                case Modes.loopQueue:
-                    if (server.queue.length==0) {
-                        server.queue = server.pastSongs;
-                        server.pastSongs = [];
-                    }
-                    suona(server,channel);
-                    return;
-                case Modes.loopQueueFromNow:
-                case Modes.loopSong:
-                    suona(server,channel);
-                    return;
-                case Modes.none:
-                    if (server.queue.length > 0) {
+            if (voiceChannel.members.size>1) {
+                switch (server.mode) {
+                    case Modes.loopQueue:
+                        if (server.queue.length==0) {
+                            server.queue = server.pastSongs;
+                            server.pastSongs = [];
+                        }
                         suona(server,channel);
-                    }
-                    break;
+                        return;
+                    case Modes.loopQueueFromNow:
+                    case Modes.loopSong:
+                        suona(server,channel);
+                        return;
+                    case Modes.none:
+                        if (server.queue.length > 0) {
+                            suona(server,channel);
+                        }
+                        break;
+                }
             }
         }
 
