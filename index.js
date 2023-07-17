@@ -96,7 +96,7 @@ client.on(Events.MessageCreate, async message => {
 
 	const comando = client.commands.find(command=>{return command.aliases.includes(nomeComando)});
 	if (comando) {
-		console.log(`[${getDate()}] [${message.user.tag}] ${message.content}`);
+		console.log(`[${getDate()}] [${message.author.tag}] ${message.content}`);
 
 		try {
 			await comando.executeMsg(message, args)
