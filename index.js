@@ -34,17 +34,22 @@ const errorMsg = {
 	ephemeral: true
 };
 
+function getDate() {
+    const d=new Date();
+    return `${d.getDate().toString().padStart(2,'0')}/${(d.getMonth()+1).toString().padStart(2,'0')}/${d.getFullYear()} - ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}:${d.getSeconds().toString().padStart(2,'0')}` 
+}
+
 // gestione degli Slash Commands
 client.on(Events.InteractionCreate, async interaction => {
 	if (!interaction.isChatInputCommand()) return;
     const command = client.commands.get(interaction.commandName);
 
 	if (!command) {
-		console.error(`No command matching ${interaction.commandName} was found.`);
+		console.error(`[${getDate()}] [${interaction.user.tag}] No command matching ${interaction.commandName} was found.`);
 		return;
 	}
 
-	console.log(command.data.name);
+	console.log(`[${getDate()}] [${interaction.user.tag}] ${command.data.name} ${interaction.options.data.map(a=>{return a.name+':'+a.value}).join(" ")}`);
 	await command.execute(interaction)
     .catch(async error=>{
 		console.error(error);
@@ -68,11 +73,11 @@ client.on(Events.InteractionCreate, async interaction => {
 	if (!interaction.isButton()) return;
 	const bottone = bottoni.filter(bottone=>{return interaction.customId.match(bottone.id)})[0];
 	if (!bottone){
-		console.error(`No button matching ${interaction.customId} was found`);
+		console.error(`[${getDate()}] [${interaction.user.tag}] No button matching ${interaction.customId} was found`);
 		return;
 	}
 
-	console.log(interaction.customId);
+	console.log(`[${getDate()}] [${interaction.user.tag}] ${interaction.customId}`);
 
 	await bottone.handler(interaction)
 	.catch(error=>{
@@ -91,7 +96,7 @@ client.on(Events.MessageCreate, async message => {
 
 	const comando = client.commands.find(command=>{return command.aliases.includes(nomeComando)});
 	if (comando) {
-		console.log(message.content);
+		console.log(`[${getDate()}] [${message.user.tag}] ${message.content}`);
 
 		try {
 			await comando.executeMsg(message, args)
