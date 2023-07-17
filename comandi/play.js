@@ -81,7 +81,7 @@ const fineCanzone = (server,channel)=>{
         server.audioResource = null;
 
         const connection = Discord.getVoiceConnection(server.guild.id);
-        if (!connection) {
+        if (connection) {
             console.error('how did we get here?');
             const voiceChannelId = connection.joinConfig.channelId;
             const voiceChannel = await server.guild.channels.fetch(voiceChannelId);
