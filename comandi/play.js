@@ -102,6 +102,7 @@ const fineCanzone = (server,channel)=>{
                     case Modes.none:
                         if (server.queue.length > 0) {
                             suona(server,channel);
+                            return;
                         }
                         break;
                 }
