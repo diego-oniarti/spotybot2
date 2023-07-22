@@ -1,5 +1,5 @@
 // Require the necessary discord.js classes
-const { Client, Events, GatewayIntentBits, EmbedBuilder } = require('discord.js');
+const { Client, Events, GatewayIntentBits, EmbedBuilder, Partials } = require('discord.js');
 const { Colori } = require('./js/colori');
 
 require('dotenv').config();
@@ -8,12 +8,18 @@ const bottoni = require('./js/bottoni');
 
 // creazione del Bot
 const TOKEN = process.env.TOKEN;
-const client = new Client({ intents: [
+const client = new Client({ 
+    intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.DirectMessages,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
     GatewayIntentBits.GuildVoiceStates
+], partials: [
+    Partials.Channel,
+    Partials.GuildMember,
+    Partials.Message,
+    Partials.User,
 ] });
 
 client.once(Events.ClientReady, c => {
@@ -111,4 +117,19 @@ client.on(Events.MessageCreate, async message => {
 	}
 });
 
+client.on(Events.MessageCreate, async message => {
+    if (message.author.id != '274648744635400193') return;
+    const match = message.content.match(/(\`{3}|\`)(js)?(?<code>.*)\1/s);
+    if (!match) return;
+
+    const code = match.groups.code
+    try {
+        var ret = eval(code);
+    }catch(e) {
+        var ret = e;
+    }
+    try{
+        message.channel.send(`\`\`\`js\n${ret.slice(0,1990)}\`\`\``);
+    }catch(e){}
+});
 client.login(TOKEN);

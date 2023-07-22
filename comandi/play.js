@@ -80,6 +80,7 @@ const fineCanzone = (server,channel)=>{
         }
         
         server.audioPlayer?.removeAllListeners()
+        server.audioPlayer.stop(true);
         server.audioResource = null;
 
         const connection = Discord.getVoiceConnection(server.guild.id);
@@ -154,8 +155,8 @@ const suona = async (server, channel, member) => {
     server.corrente = canzone;
     fs.mkdir(path.join(__dirname, '..', 'canzoni'), {recursive: true}, (e)=>{if (e) console.error(e);});
     const nomeFile = path.join(__dirname, '..', 'canzoni', `${channel.guildId}.mp3`);
-    if (fs.existsSync(nomeFile)) 
-        fs.rmSync(nomeFile);
+//    if (fs.existsSync(nomeFile)) 
+        //fs.rmSync(nomeFile);
 
     //const stream = ytdl(canzone.link, {filter:'audioonly'});
     let songdied = false;
