@@ -45,11 +45,11 @@ client.on(Events.InteractionCreate, async interaction => {
     const command = client.commands.get(interaction.commandName);
 
 	if (!command) {
-		console.error(`[${getDate()}] [${interaction.user.tag}] [${interaction?.guild.name||'dm'}] No command matching ${interaction.commandName} was found.`);
+		console.error(`[${getDate()}] [${interaction.user.tag}] [${interaction.guild?.name||'dm'}] No command matching ${interaction.commandName} was found.`);
 		return;
 	}
 
-	console.log(`[${getDate()}] [${interaction.user.tag}] [${interaction?.guild.name||'dm'}] ${command.data.name} ${interaction.options.data.map(a=>{return a.name+':'+a.value}).join(" ")}`);
+	console.log(`[${getDate()}] [${interaction.user.tag}] [${interaction.guild?.name||'dm'}] ${command.data.name} ${interaction.options.data.map(a=>{return a.name+':'+a.value}).join(" ")}`);
 	await command.execute(interaction)
     .catch(async error=>{
 		console.error(error);
@@ -74,7 +74,7 @@ client.on(Events.InteractionCreate, async interaction => {
 		return;
 	}
 
-	console.log(`[${getDate()}] [${interaction.user.tag}] [${interaction?.guild.name||'dm'}] ${interaction.customId}`);
+	console.log(`[${getDate()}] [${interaction.user.tag}] [${interaction.guild?.name||'dm'}] ${interaction.customId}`);
 
 	await bottone.handler(interaction)
 	.catch(error=>{
@@ -93,7 +93,7 @@ client.on(Events.MessageCreate, async message => {
 
 	const comando = client.commands.find(command=>{return command.aliases.includes(nomeComando)});
 	if (comando) {
-		console.log(`[${getDate()}] [${message.author.tag}] [${message?.guild.name||'dm'}] ${message.content}`);
+		console.log(`[${getDate()}] [${message.author.tag}] [${message.guild?.name||'dm'}] ${message.content}`);
 
 		try {
 			await comando.executeMsg(message, args)
