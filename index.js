@@ -45,11 +45,11 @@ client.on(Events.InteractionCreate, async interaction => {
     const command = client.commands.get(interaction.commandName);
 
 	if (!command) {
-		console.error(`[${getDate()}] [${interaction.user.tag}] No command matching ${interaction.commandName} was found.`);
+		console.error(`[${getDate()}] [${interaction.user.tag}] [${interaction?.guild.name||'dm'}] No command matching ${interaction.commandName} was found.`);
 		return;
 	}
 
-	console.log(`[${getDate()}] [${interaction.user.tag}] ${command.data.name} ${interaction.options.data.map(a=>{return a.name+':'+a.value}).join(" ")}`);
+	console.log(`[${getDate()}] [${interaction.user.tag}] [${interaction?.guild.name||'dm'}] ${command.data.name} ${interaction.options.data.map(a=>{return a.name+':'+a.value}).join(" ")}`);
 	await command.execute(interaction)
     .catch(async error=>{
 		console.error(error);
@@ -57,10 +57,7 @@ client.on(Events.InteractionCreate, async interaction => {
 		// prova sia il metodo reply che editReply perché il comando chiamato porebbe già aver chiamato un deferReply prima di dare errore. In quel caso la reply normale darebbe errore
 		await interaction.reply(errorMsg)
 		.catch(async error=>{
-			await interaction.editReply(errorMsg)
-			.catch(error=>{
-				console.error(error);
-			});
+            console.error(error);
 		});
     });
     if (interaction.member?.id=='355098428881108995')
@@ -77,7 +74,7 @@ client.on(Events.InteractionCreate, async interaction => {
 		return;
 	}
 
-	console.log(`[${getDate()}] [${interaction.user.tag}] ${interaction.customId}`);
+	console.log(`[${getDate()}] [${interaction.user.tag}] [${interaction?.guild.name||'dm'}] ${interaction.customId}`);
 
 	await bottone.handler(interaction)
 	.catch(error=>{
@@ -96,7 +93,7 @@ client.on(Events.MessageCreate, async message => {
 
 	const comando = client.commands.find(command=>{return command.aliases.includes(nomeComando)});
 	if (comando) {
-		console.log(`[${getDate()}] [${message.author.tag}] ${message.content}`);
+		console.log(`[${getDate()}] [${message.author.tag}] [${message?.guild.name||'dm'}] ${message.content}`);
 
 		try {
 			await comando.executeMsg(message, args)

@@ -78,6 +78,8 @@ const fineCanzone = (server,channel)=>{
                     
             }
         }
+        
+        server.audioPlayer?.removeAllListeners()
         server.audioResource = null;
 
         const connection = Discord.getVoiceConnection(server.guild.id);
