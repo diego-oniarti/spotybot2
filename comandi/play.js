@@ -80,7 +80,7 @@ const fineCanzone = (server,channel)=>{
         }
         
         server.audioPlayer?.removeAllListeners()
-        server.audioPlayer.stop(true);
+        server.audioPlayer?.stop(true);
         server.audioResource = null;
 
         const connection = Discord.getVoiceConnection(server.guild.id);
