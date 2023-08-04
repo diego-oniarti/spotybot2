@@ -1,0 +1,25 @@
+body {
+    font-family: 'Roboto', sans-serif;
+}
+
+#bottoneSpotify {
+    background-color: #1db954;
+    padding: 10px;
+    border-radius: 1000px;
+    width: fit-content;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+#spotify {
+    font-weight: bolder;
+    font-size: 45px;
+    margin-right: 5px;
+}
+
+.buttonLink {
+    color: unset;
+    text-decoration: none;
+}

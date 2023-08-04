@@ -14,6 +14,8 @@ const requisiti = require('../js/requisiti');
 const EventEmitter = require('node:events');
 const ytdl = require('ytdl-core');
 
+const DB_PATH = process.env.DB_PATH;
+
 const barStile = (nome)=>{
     if (nome)
         nome+=' ';
@@ -38,25 +40,63 @@ const errors = {
 let spotifyToken;
 
 // refresha il token di spotify (scade dopo un'ora) che serve per ogni chiamata alle API di spotify
-const getSpotifyToken = async ()=>{
-    const client_id = process.env.SPOTIFY_CLIENT_ID;
-    const client_secret = process.env.SPOTIFY_CLIENT_SECRET;
-
+const getBotToken = async() => {
     const params = new URLSearchParams();
     params.append('grant_type', 'client_credentials');
-
-    const res = await fetch('https://accounts.spotify.com/api/token', {
+    fetch('https://accounts.spotify.com/api/token', {
         method: 'POST',
         headers: {
-            'Authorization': 'Basic ' + (new Buffer.from(client_id + ':' + client_secret).toString('base64'))
+            'Authorization': 'Basic ' + (new Buffer.from(process.env.SPOTIFY_CLIENT_ID + ':' + process.env.SPOTIFY_CLIENT_SECRET).toString('base64'))
         },
         body: params,
+    })
+    .then(res=>res.json())
+    .then(data=>{
+        spotifyToken = data.access_token;
+        console.log(`Got new token: ${spotifyToken}`)
     });
-    const data = await res.json();
+}
+getBotToken();
 
-    spotifyToken = data.access_token;
-    console.log(`new access token: ${data.access_token}`);
-    return data.access_token;
+const getSpotifyToken = async(userID)=>{
+    if (!userID) return spotifyToken;
+
+    const DB = JSON.parse(fs.readFileSync(DB_PATH));
+    if (DB.users[userID]?.access_token) {
+        return DB.users[userID].access_token;
+    } else {
+        return spotifyToken;
+    }
+}
+
+const refreshSpotifyToken = async (userID)=>{
+    console.log(`refreshing for ${userID}`);
+    let DB = JSON.parse(fs.readFileSync(DB_PATH));
+    if (userID && DB.users[userID]?.refresh_token) {
+        console.log("from database");
+        const params = new URLSearchParams();
+        params.append('grant_type', 'refresh_token');
+        params.append('refresh_token', DB.users[userID].refresh_token);
+
+        const res = await fetch('https://accounts.spotify.com/api/token', {
+            method: 'POST',
+            headers: {
+                'Authorization': 'Basic ' + (new Buffer.from(process.env.SPOTIFY_CLIENT_ID + ':' + process.env.SPOTIFY_CLIENT_SECRET).toString('base64')),
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: params,
+        });
+        const data = await res.json();
+        DB = JSON.parse(fs.readFileSync(DB_PATH));
+        DB.users[userID].access_token = data.access_token;
+        if (data.refresh_token) DB.users[userID].refresh_token = data.refresh_token;
+        fs.writeFileSync(DB_PATH, JSON.stringify(DB));
+        return;
+    }else{
+        console.log("from bot")
+        return await getBotToken();
+    }   
+    
 }
 
 // ritorna una funzione che detta il comportamento del bot quando finisce una canzone
@@ -155,8 +195,6 @@ const suona = async (server, channel, member) => {
     server.corrente = canzone;
     fs.mkdir(path.join(__dirname, '..', 'canzoni'), {recursive: true}, (e)=>{if (e) console.error(e);});
     const nomeFile = path.join(__dirname, '..', 'canzoni', `${channel.guildId}.mp3`);
-//    if (fs.existsSync(nomeFile)) 
-        //fs.rmSync(nomeFile);
 
     //const stream = ytdl(canzone.link, {filter:'audioonly'});
     let songdied = false;
@@ -292,38 +330,38 @@ const trackToTitle = (track)=>{
     return ricerca.join(' ');
 }
 
-const spotifyTrack = async (id)=>{
+const spotifyTrack = async (id, userID)=>{
     const res = await fetch(`https://api.spotify.com/v1/tracks/${id}`,{
         headers: {
-            'Authorization': `Bearer ${spotifyToken}`
+            'Authorization': `Bearer ${await getSpotifyToken(userID)}`
         }
     });
     const data = await res.json();
 
     if (res.status == 401 && data.error.message=='The access token expired'){
-        await getSpotifyToken();
-        return (spotifyTrack(id));
+        await refreshSpotifyToken(userID);
+        return (spotifyTrack(id,userID));
     }
     await parseSpotify(data);
 
     return trackToTitle(data);
 }
 
-const spotifyAlbum = async (id)=>{
+const spotifyAlbum = async (id, userID)=>{
     const bar = new cliProgress.SingleBar(barStile('album-tracks'), cliProgress.Presets.shades_classic);
     let primo = true;
 
     const iteraLink = async (link)=>{
         const res = await fetch(link,{
             headers: {
-                'Authorization': `Bearer ${spotifyToken}`
+                'Authorization': `Bearer ${await getSpotifyToken(userID)}`
             }
         });
         const data = await res.json();
 
         if (res.status == 401 && data.error.message=='The access token expired'){
-            await getSpotifyToken();
-            return (iteraLink(link));
+            await refreshSpotifyToken(userID);
+            return (iteraLink(link, userID));
         }
         await parseSpotify(data);
     
@@ -348,16 +386,16 @@ const spotifyAlbum = async (id)=>{
     return titoli;
 }
 
-const spotifyArtist = async (id) =>{
+const spotifyArtist = async (id, userID) =>{
     const res = await fetch(`https://api.spotify.com/v1/artists/${id}/top-tracks?market=IT`,{
         headers: {
-            'Authorization': `Bearer ${spotifyToken}`
+            'Authorization': `Bearer ${await getSpotifyToken(userID)}`
         }
     });
     const data = await res.json();
     
     if (res.status == 401 && data.error.message=='The access token expired'){
-        await getSpotifyToken();
+        await refreshSpotifyToken(userID);
         return (spotifyArtist(id));
     }
     await parseSpotify(data);
@@ -370,20 +408,20 @@ const spotifyArtist = async (id) =>{
     return titoli;
 }
 
-const spotifyPlaylist = async (id) =>{
+const spotifyPlaylist = async (id, userID) =>{
     const bar = new cliProgress.SingleBar(barStile('playlist-tracks'), cliProgress.Presets.shades_classic);
     let primo = true;
 
     const iteraLink = async (link)=>{
         const res = await fetch(link,{
             headers: {
-                'Authorization': `Bearer ${spotifyToken}`
+                'Authorization': `Bearer ${await getSpotifyToken(userID)}`
             }
         });
         const data = await res.json();
 
         if (res.status == 401 && data.error.message=='The access token expired'){
-            await getSpotifyToken();
+            await refreshSpotifyToken(userID);
             return (iteraLink(link));
         }
         await parseSpotify(data);
@@ -438,44 +476,41 @@ const updateDiscordBar = async (emitter,bar)=>{
     });
 }
 
-cercaNomeCollection = async (id,emitter, resource)=>{
+cercaNomeCollection = async (id,emitter, resource, userID)=>{
     const res = await fetch(`https://api.spotify.com/v1/${{playlist:'playlists', album:'albums', artist:'artists'}[resource]}/${id}?market=IT`,{
         headers: {
-            'Authorization': `Bearer ${spotifyToken}`
+            'Authorization': `Bearer ${await getSpotifyToken(userID)}`
         }
     });
     const data = await res.json();
 
     if (res.status == 401 && data.error.message=='The access token expired'){
-        await getSpotifyToken();
-        return (cercaNomeCollection(id,emitter,resource));
+        await refreshSpotifyToken(userID);
+        return (cercaNomeCollection(id,emitter,resource,userID));
     }
     await parseSpotify(data);
 
     await emitter.emit('collectionTitle', data.name);
 }
 
-const trovaLinkSpotify = async(id, resource, server,position,emitter)=>{
+const trovaLinkSpotify = async(id, resource, server,position,emitter, userID)=>{
     const titoli = [];
-    if (!spotifyToken){
-        await getSpotifyToken();
-    }
 
     switch (resource){
         case 'track':
-            titoli.push(await spotifyTrack(id));
+            titoli.push(await spotifyTrack(id, userID));
             break;
         case 'album':
-            await cercaNomeCollection(id,emitter,resource);
-            titoli.push(... (await ( spotifyAlbum(id))));
+            await cercaNomeCollection(id,emitter,resource, userID);
+            titoli.push(... (await ( spotifyAlbum(id, userID))));
             break;
         case 'artist':
-            await cercaNomeCollection(id,emitter,resource);
-            titoli.push(... (await ( spotifyArtist(id))));
+            await cercaNomeCollection(id,emitter,resource, userID);
+            titoli.push(... (await ( spotifyArtist(id, userID))));
             break;
         case 'playlist':
-            await cercaNomeCollection(id,emitter,resource);
-            titoli.push(... (await ( spotifyPlaylist(id))));
+            await cercaNomeCollection(id,emitter,resource, userID);
+            titoli.push(... (await ( spotifyPlaylist(id, userID))));
             break;
     }
 
@@ -507,8 +542,8 @@ const trovaLinkSpotify = async(id, resource, server,position,emitter)=>{
                 } )()
             }))
         ).filter(a=>a);
-        canzoni.push(...trovate);
         server.queue.splice(position+canzoni.length,0,...trovate);
+        canzoni.push(...trovate);
         if (titoliBatch.indexOf(batch)==0)
             await emitter.emit('firstFound');
     }
@@ -609,7 +644,7 @@ const trovaCanzoneYT = async (videoId, server, position, emitter, suonare=true)=
 }
 
 //deve ritornare un lista di canzoni
-const accodaCanzoni = async (song, server, position, emitter)=>{
+const accodaCanzoni = async (song, server, position, emitter, userID)=>{
     if (song.match(/^https:\/\/youtu\.be\/.{11}$|^https:\/\/(www\.)?youtube\.com\/watch\?v=.{11}$/)){
         const match = song.match(/^https:\/\/youtu\.be\/(?<videoId>.{11})$|^https:\/\/(www\.)?youtube\.com\/watch\?v=(?<videoId2>.{11})$/);
         const videoId = match.groups.videoId || match.groups.videoId2;
@@ -627,7 +662,7 @@ const accodaCanzoni = async (song, server, position, emitter)=>{
         const match = song.match(/https:\/\/open\.spotify\.com\/(?<resource>track|album|artist|playlist)\/(?<id>.{22})/);
         const id =  match.groups.id;
         const resource = match.groups.resource;
-        return await trovaLinkSpotify(id, resource, server,position,emitter);
+        return await trovaLinkSpotify(id, resource, server,position,emitter, userID);
     }
     return [await ricercaTitolo(song, server,position,emitter)];
 }
@@ -680,7 +715,7 @@ const comando = async (song,position, member,channel, emitter)=>{
     const posizione = ((!position || position==-1) && position!=0)? server.queue.length : Math.min(Math.max(position,0), server.queue.length);
     // cerca la canzone (o le canzoni) e ritorna un messaggio d'errore se non si trova nulla
     try {
-        var canzoni = await accodaCanzoni(song, server,posizione, emitter);
+        var canzoni = await accodaCanzoni(song, server,posizione, emitter, member.user.id);
     }catch(error){
         let errorMsg;
         switch (error){

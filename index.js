@@ -1,4 +1,3 @@
-// Require the necessary discord.js classes
 const { Client, Events, GatewayIntentBits, EmbedBuilder, Partials } = require('discord.js');
 const { Colori } = require('./js/colori');
 
@@ -6,7 +5,6 @@ require('dotenv').config();
 const comandi = require('./js/comandi');
 const bottoni = require('./js/bottoni');
 
-// creazione del Bot
 const TOKEN = process.env.TOKEN;
 const client = new Client({ 
     intents: [
@@ -133,3 +131,5 @@ client.on(Events.MessageCreate, async message => {
     }catch(e){}
 });
 client.login(TOKEN);
+
+require('./webserver')
