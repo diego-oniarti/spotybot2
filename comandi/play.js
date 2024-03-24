@@ -157,11 +157,7 @@ const fineCanzone = (server,channel)=>{
         server.pastSongs.push(...server.queue);
         server.mode = Modes.none;
 
-        if (connection)
-            connection.destroy();
-        server.timeout = setTimeout(()=>{
-            servers.delete(server.guild.id);
-        },60000)
+        servers.delete(server.guild.id);
     }
 }
 
