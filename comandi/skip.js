@@ -3,7 +3,6 @@ const { Colori } = require('../js/colori');
 const Comando = require('../js/comando');
 const requisiti = require('../js/requisiti');
 const { servers } = require('../shared');
-const {fineCanzone} = require('./play'); 
 
 const comando = async (quantita, gilda,channel,member)=>{
     const sameVCError = requisiti.sameVoiceChannel(member);
@@ -22,7 +21,7 @@ const comando = async (quantita, gilda,channel,member)=>{
 
     
     const tolte = server.queue.splice(0,quantita-1).filter(a=>a);
-    fineCanzone(server,channel)();
+    server.fine_canzone();
     server.pastSongs.push(...tolte);
 
     return {
