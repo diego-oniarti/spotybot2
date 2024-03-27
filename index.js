@@ -59,7 +59,7 @@ client.on(Events.InteractionCreate, async interaction => {
 		console.error(error);
 
 		// prova sia il metodo reply che editReply perché il comando chiamato porebbe già aver chiamato un deferReply prima di dare errore. In quel caso la reply normale darebbe errore
-		await interaction.reply(errorMsg)
+		await interaction.editReply(errorMsg)
 		.catch(async error=>{
             console.error(error);
 		});

@@ -122,7 +122,7 @@ class Server {
         this.isPlaying=false;
         this.audioResource = undefined;
         this.pastSongs.push(...this.queue);
-        this.mode = Modes.none;zz
+        this.mode = Modes.none;
     }
     errore_canzone() {
 	this.fine_canzone();

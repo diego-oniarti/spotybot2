@@ -102,16 +102,17 @@ async function titolo_to_id(song_title) {
 	throw Errors.TitleNotFound;
     }
     return match[1];*/
-    return await play.search(song_title, {limit:1})[0].id;
+    return (await play.search(song_title, {limit:1}))[0].id;
 }
 
 async function get_song_details(song_id) {
     const res = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${song_id}&key=${youtube_key}`);
 
     if (!res.ok) throw Errors.IdNotFound;
-    
+
     const snippet = await res.json();
     const item = snippet.items[0];
+    
     if (!item){
         throw Errors.IdNotFound;
     }
@@ -133,7 +134,7 @@ class SongCollection{
 }
 
 async function titolo_to_details(title) {
-    return await trova_canzone_yt(titolo_to_id(title));
+    return await get_song_details(await titolo_to_id(title));
 }
 
 async function trova_canzone_yt(video_id){
@@ -207,6 +208,53 @@ async function trova_link_spotify(resource_id, resource_type, userID){
     }[resource_type](resource_id, userID);
 }
 
+async function spotify_artist(artist_id, userID) {
+    let artist_name="";
+    await fetch(`https://api.spotify.com/v1/artists/${artist_id}`, {
+	headers: {'Authorization': `Bearer ${await get_spotify_token(userID)}`}
+    }).then(res=>res.json())
+	.then(data=>{artist_name = data.name});
+    return new SongCollection(
+	artist_name,
+	`https://open.spotify.com/artist/${artist_id}`,
+	async function* () {
+	    const data = await fetch(`https://api.spotify.com/v1/artists/${artist_id}/top-tracks`,{headers: {'Authorization': `Bearer ${await get_spotify_token(userID)}`}}).then(res=>res.json());
+	    for (const track of data.tracks) {
+		yield titolo_to_details(spotify_track_to_title(track));
+	    }
+	}
+    );
+}
+
+async function spotify_playlist(playlist_id, userID){
+    return await fetch(`https://api.spotify.com/v1/playlists/${playlist_id}`, {
+	headers: {'Authorization': `Bearer ${await get_spotify_token(userID)}`}
+    })
+	.then(res=>res.json())
+	.then(data=>{
+	    return new SongCollection(
+		data.name,
+		`https://open.spotify.com/playlists/${playlist_id}`,
+		async function* () {
+		    for (const item of data.tracks.items) {
+			yield titolo_to_details(spotify_track_to_title(item.track));
+		    }
+		    let next = data.tracks.next;
+		    while (next) {
+			const data = await fetch(next,{headers: {'Authorization': `Bearer ${await get_spotify_token(userID)}`}}).then(res=>res.json());
+			for (const item of data.tracks.items) {
+			    yield titolo_to_details(spotify_track_to_title(item.track));
+			}		
+		    }
+		}
+	    );
+	})
+	.catch(e=>{
+	    console.error(e);
+	    throw Errors.SpotifyCantFind;
+	});
+}
+
 async function spotify_album(album_id, userID) {
     return await fetch(`https://api.spotify.com/v1/albums/${album_id}`, {
 	headers: {'Authorization': `Bearer ${await get_spotify_token(userID)}`}
@@ -217,12 +265,12 @@ async function spotify_album(album_id, userID) {
 		data.name,
 		`https://open.spotify.com/album/${album_id}`,
 		async function* () {
-		    for (const item of tracks.items) {
+		    for (const item of data.tracks.items) {
 			yield titolo_to_details(spotify_track_to_title(item));
 		    }
 		    let next = data.tracks.next;
 		    while (next) {
-			const data = await fetch(next).then(res=>res.json());
+			const data = await fetch(next,{headers: {'Authorization': `Bearer ${await get_spotify_token(userID)}`}}).then(res=>res.json());
 			for (const item of data.tracks.items) {
 			    yield titolo_to_details(spotify_track_to_title(item));
 			}
@@ -246,9 +294,12 @@ async function spotify_track(track_id, userID) {
     const data = await res.json();
     if (res.status == 401 && data.error.message=='The access token expired'){
         await refresh_spotyfy_token(userID);
-        return (spotify_track(id,userID));
+        return (spotify_track(track_id,userID));
     }
-    if (data.error) throw Errors.SpotifyCantFind;
+    if (data.error) {
+	console.log(data);
+	throw Errors.SpotifyCantFind;
+    }
     const song = await titolo_to_details(spotify_track_to_title(data));
     return new SongCollection(song.title, song.link, async function*(){yield song});
 }
@@ -271,11 +322,11 @@ async function find_songs(song_query, userID) {
         const listId = match.groups.listId || match.groups.listId2;
         return await trova_lista_yt(listId);
     }
-    if (song_query.match(/^https:\/\/open\.spotify\.com\/(track|album|artist|playlist)\/.{22}/)){
-        const match = song_query.match(/https:\/\/open\.spotify\.com\/(?<resource>track|album|artist|playlist)\/(?<id>.{22})/);
+    if (song_query.match(/^https:\/\/open\.spotify\.com.*\/(track|album|artist|playlist)\/.{22}/)){
+        const match = song_query.match(/https:\/\/open\.spotify\.com.*\/(?<resource>track|album|artist|playlist)\/(?<id>.{22})/);
         const id =  match.groups.id;
         const resource = match.groups.resource;
-        return await trova_link_spotify(id, resource, server,position,emitter, userID);
+        return await trova_link_spotify(id, resource, userID);
     }
     return await ricerca_titolo(song_query);
 }

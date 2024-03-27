@@ -57,7 +57,7 @@ module.exports = {
         executeMsg: async (messaggio, args) => {
             const volume = parseInt(args[0]);
             
-            if (isNaN(volume) || volume<0 || volume>100)
+            if (isNaN(volume) || volume<0 || volume>10000)
                 return await messaggio.channel.send({
                     embeds: [
                         new EmbedBuilder()
