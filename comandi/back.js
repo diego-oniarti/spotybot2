@@ -3,7 +3,6 @@ const { Colori } = require('../js/colori');
 const Comando = require('../js/comando');
 const requisiti = require('../js/requisiti');
 const { servers } = require('../shared');
-const {fineCanzone} = require('./play'); 
 
 const comando = async (quantita, gilda,channel,member)=>{
     const sameVCError = requisiti.sameVoiceChannel(member);
@@ -24,7 +23,7 @@ const comando = async (quantita, gilda,channel,member)=>{
     const vecchie = server.pastSongs.splice(Math.max(0,server.pastSongs.length-quantita),  quantita);
     server.queue.unshift(...vecchie, server.corrente);
 
-    fineCanzone(server,channel)();
+    server.fine_canzone();
 
     // scarta il duplicato che viene dreato da fineCanzone
     server.pastSongs.pop();
