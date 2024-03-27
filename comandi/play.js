@@ -5,11 +5,11 @@ const { Colori } = require('../js/colori');
 const fs = require('node:fs');
 const fetch = require('node-fetch');
 const { servers } = require('../shared');
-const { Server, Modes } = require('../js/server');
+const { Server } = require('../js/server');
 const cliProgress = require('cli-progress');
 const querystring = require('node:querystring');
 const requisiti = require('../js/requisiti');
-const EventEmitter = require('node:events');
+const play = require('play-dl');
 
 const DB_PATH = process.env.DB_PATH;
 const youtube_key = process.env.YOUTUBE_KEY;
@@ -19,6 +19,7 @@ const Errors = {
     TitleNotFound: 0,
     IdNotFound: 1,
     YoutubeKeyExpired: 2,
+    SpotifyCantFind: 3,
 }
 
 // Get the style for a progress bar given its name.
@@ -94,13 +95,14 @@ async function refresh_spotyfy_token(userID) {
 
 // Takes a song title and returns it's youtube id. Throws an error if it can't find it
 async function titolo_to_id(song_title) {
-    const pagina = await fetch(encodeURI(`https://www.youtube.com/results?search_query=${song_title}`));
+/*    const pagina = await fetch(encodeURI(`https://www.youtube.com/results?search_query=${song_title}`));
     const html = await pagina.text();
     const match = html.match(/\"videoId\"\:\"(.{1,12})\"/);
     if (!match) {
 	throw Errors.TitleNotFound;
     }
-    return match[1];
+    return match[1];*/
+    return await play.search(song_title, {limit:1})[0].id;
 }
 
 async function get_song_details(song_id) {
@@ -128,6 +130,10 @@ class SongCollection{
 	this.link = link;
 	this.generator=generator;
     }
+}
+
+async function titolo_to_details(title) {
+    return await trova_canzone_yt(titolo_to_id(title));
 }
 
 async function trova_canzone_yt(video_id){
@@ -191,16 +197,64 @@ async function trova_lista_yt(list_id){
 }
 
 async function trova_link_spotify(resource_id, resource_type, userID){
-    switch (resource_type) {
-    case 'track':
-	break;
-    case 'album':
-	break;
-    case 'artist':
-	break;
-    case 'playlist':
-	break;
+    // sceglie una funzione e la chiama con dei parametri. I <3 readable code
+    refresh_spotyfy_token(userID);
+    return await {
+	'track': spotify_track,
+	'album': spotify_album,
+	'artist': spotify_artist,
+	'playlist': spotify_playlist,
+    }[resource_type](resource_id, userID);
+}
+
+async function spotify_album(album_id, userID) {
+    return await fetch(`https://api.spotify.com/v1/albums/${album_id}`, {
+	headers: {'Authorization': `Bearer ${await get_spotify_token(userID)}`}
+    })
+	.then(res=>res.json())
+	.then(data=>{
+	    return new SongCollection(
+		data.name,
+		`https://open.spotify.com/album/${album_id}`,
+		async function* () {
+		    for (const item of tracks.items) {
+			yield titolo_to_details(spotify_track_to_title(item));
+		    }
+		    let next = data.tracks.next;
+		    while (next) {
+			const data = await fetch(next).then(res=>res.json());
+			for (const item of data.tracks.items) {
+			    yield titolo_to_details(spotify_track_to_title(item));
+			}
+			next = data.tracks.next;
+		    }
+		}
+	    );
+	})
+	.catch(e=>{
+	    console.error(e);
+	    throw Errors.SpotifyCantFind;
+	});
+}
+
+async function spotify_track(track_id, userID) {
+    const res = await fetch(`https://api.spotify.com/v1/tracks/${track_id}`,{
+        headers: {
+            'Authorization': `Bearer ${await get_spotify_token(userID)}`
+        }
+    });
+    const data = await res.json();
+    if (res.status == 401 && data.error.message=='The access token expired'){
+        await refresh_spotyfy_token(userID);
+        return (spotify_track(id,userID));
     }
+    if (data.error) throw Errors.SpotifyCantFind;
+    const song = await titolo_to_details(spotify_track_to_title(data));
+    return new SongCollection(song.title, song.link, async function*(){yield song});
+}
+
+function spotify_track_to_title(track){
+    return [track.name, ...track.artists.map(artist=>artist.name)].join(' ');
 }
 
 async function find_songs(song_query, userID) {
@@ -221,7 +275,7 @@ async function find_songs(song_query, userID) {
         const match = song_query.match(/https:\/\/open\.spotify\.com\/(?<resource>track|album|artist|playlist)\/(?<id>.{22})/);
         const id =  match.groups.id;
         const resource = match.groups.resource;
-        return await trovaLinkSpotify(id, resource, server,position,emitter, userID);
+        return await trova_link_spotify(id, resource, server,position,emitter, userID);
     }
     return await ricerca_titolo(song_query);
 }
