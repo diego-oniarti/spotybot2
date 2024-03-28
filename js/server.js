@@ -119,6 +119,7 @@ class Server {
 
         // lascia il canale
 	connection?.disconnect();
+	connection?.destroy();
         this.isPlaying=false;
         this.audioResource = undefined;
         this.pastSongs.push(...this.queue);
