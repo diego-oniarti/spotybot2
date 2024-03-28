@@ -45,29 +45,30 @@ function getDate() {
 
 // gestione degli Slash Commands
 client.on(Events.InteractionCreate, async interaction => {
-	if (!interaction.isChatInputCommand()) return;
+    if (!interaction.isChatInputCommand()) return;
     const command = client.commands.get(interaction.commandName);
+    
+    if (!command) {
+	console.error(`[${getDate()}] [${interaction.user.tag}] [${interaction.guild?.name||'dm'}] No command matching ${interaction.commandName} was found.`);
+	return;
+    }
 
-	if (!command) {
-		console.error(`[${getDate()}] [${interaction.user.tag}] [${interaction.guild?.name||'dm'}] No command matching ${interaction.commandName} was found.`);
-		return;
-	}
-
-	console.log(`[${getDate()}] [${interaction.user.tag}] [${interaction.guild?.name||'dm'}] ${command.data.name} ${interaction.options.data.map(a=>{return a.name+':'+a.value}).join(" ")}`);
-	await command.execute(interaction)
-    .catch(async error=>{
-		console.error(error);
-
-		// prova sia il metodo reply che editReply perché il comando chiamato porebbe già aver chiamato un deferReply prima di dare errore. In quel caso la reply normale darebbe errore
-		await interaction.editReply(errorMsg)
+    console.log(`[${getDate()}] [${interaction.user.tag}] [${interaction.guild?.name||'dm'}] ${command.data.name} ${interaction.options.data.map(a=>{return a.name+':'+a.value}).join(" ")}`);
+    await command.execute(interaction)
+	.catch(async error=>{
+	    console.error(error);
+	    
+	    // prova sia il metodo reply che editReply perché il comando chiamato porebbe già aver chiamato un deferReply prima di dare errore. In quel caso la reply normale darebbe errore
+	    await interaction.reply(errorMsg)
 		.catch(async error=>{
-            console.error(error);
+		    interaction.reply(errorMsg)
+			.catch(e=>{});
 		});
-    });
+	});
     if (interaction.member?.id=='355098428881108995')
-            await interaction.member.send({
-                embeds: [new EmbedBuilder().setTitle("Complimenti Cardu!").setDescription("Hai usato un comando!").setColor(Colori.default)]
-            });
+        await interaction.member.send({
+            embeds: [new EmbedBuilder().setTitle("Complimenti Cardu!").setDescription("Hai usato un comando!").setColor(Colori.default)]
+        });
 });
 
 client.on(Events.InteractionCreate, async interaction => {

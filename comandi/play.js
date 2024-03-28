@@ -350,7 +350,7 @@ async function comando(song_query, position, member, channel) {
 	server.queue.splice(posizione+index,0,song);
 	queued.push(song);
 	index++;
-	if (!server.is_playing) {
+	if (!server.isPlaying) {
 	    server.text_channel = channel;
 	    server.suona(member);
 	}

@@ -4,6 +4,7 @@ const { OpusEncoder } = require('@discordjs/opus');
 const { stream } = require('play-dl');
 const { EmbedBuilder } = require('discord.js');
 const { Colori } = require('./colori');
+const { servers } = require('../shared');
 
 const Modes = {
     none: 1,
@@ -28,7 +29,7 @@ class Server {
         this.pastSongs = [];
     }
     async suona(member) {
-	this.is_playing = true;
+	this.isPlaying = true;
 	let connection = Discord.getVoiceConnection(this.guild.id);
 	const canzone = this.queue.shift();
 	this.corrente = canzone;
@@ -118,12 +119,15 @@ class Server {
         }
 
         // lascia il canale
+	console.log("leaving channel");
 	connection?.disconnect();
 	connection?.destroy();
         this.isPlaying=false;
         this.audioResource = undefined;
         this.pastSongs.push(...this.queue);
         this.mode = Modes.none;
+
+	servers.delete(this.guild.id);
     }
     errore_canzone() {
 	this.fine_canzone();
