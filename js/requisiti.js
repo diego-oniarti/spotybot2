@@ -2,7 +2,7 @@ const { EmbedBuilder } = require('@discordjs/builders');
 const Discord = require('@discordjs/voice');
 const { Colori } = require('./colori');
 
-anyVoiceChannel = (member)=>{
+function anyVoiceChannel(member) {
     if (!member.voice.channel)
         return {
             embeds: [
@@ -14,7 +14,7 @@ anyVoiceChannel = (member)=>{
         }
 }
 
-sameVoiceChannel = (member)=>{
+function sameVoiceChannel(member) {
     const anyVCError = anyVoiceChannel(member);
     if (anyVCError){
         return anyVCError;
@@ -33,7 +33,7 @@ sameVoiceChannel = (member)=>{
         }
 }
 
-playing = (guild)=>{
+function playing(guild) {
     const connection = Discord.getVoiceConnection(guild.id);
     if (!connection)
         return {
