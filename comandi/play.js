@@ -126,10 +126,11 @@ async function get_song_details(song_id) {
 
 
 class SongCollection{
-    constructor(title="",link="",generator= async function* (){}){
+    constructor(title="",link="",size=1,generator= async function* (){}){
 	this.title = title;
 	this.link = link;
 	this.generator=generator;
+	this.size = size;
     }
 }
 
@@ -139,31 +140,32 @@ async function titolo_to_details(title) {
 
 async function trova_canzone_yt(video_id){
     const details = await get_song_details(video_id);
-    return new SongCollection(details.titolo, details.link, async function*(){yield details});
+    return new SongCollection(details.titolo, details.link, 1, async function*(){yield details});
 }
 
 async function ricerca_titolo(title){
     const song_id = await titolo_to_id(title);
     const song_deatils = await get_song_details(song_id);
-    return new SongCollection(song_deatils.titolo, song_deatils.link, async function*(){yield song_deatils});
+    return new SongCollection(song_deatils.titolo, song_deatils.link, 1, async function*(){yield song_deatils});
 }
 
 async function trova_lista_yt(list_id){
-    let list_title;
+    let list_title, list_length;
     await fetch('https://www.googleapis.com/youtube/v3/playlists?'+querystring.stringify({
-        part: 'snippet',
+        part: 'snippet,contentDetails',
         id: list_id,
         key: youtube_key,
     }))
     .then(res=>res.json())
     .then(data=>{
 	list_title = data.items[0].snippet.title;
+	list_length = data.items[0].contentDetails.itemCount;
     })
     .catch(error=>{
         console.error(error);
     });
 
-    return new SongCollection(list_title, `https://www.youtube.com/playlist?list=${list_id}`, async function*(){
+    return new SongCollection(list_title, `https://www.youtube.com/playlist?list=${list_id}`, list_length, async function*(){
 	let token, has_next_page;
 	do {
 	    has_next_page = false;
@@ -217,6 +219,7 @@ async function spotify_artist(artist_id, userID) {
     return new SongCollection(
 	artist_name,
 	`https://open.spotify.com/artist/${artist_id}`,
+	10,
 	async function* () {
 	    const data = await fetch(`https://api.spotify.com/v1/artists/${artist_id}/top-tracks`,{headers: {'Authorization': `Bearer ${await get_spotify_token(userID)}`}}).then(res=>res.json());
 	    for (const track of data.tracks) {
@@ -227,18 +230,16 @@ async function spotify_artist(artist_id, userID) {
 }
 
 async function spotify_playlist(playlist_id, userID){
-    console.log("playlist id", playlist_id);
-    console.log(get_spotify_token(userID));
     return await fetch(`https://api.spotify.com/v1/playlists/${playlist_id}`, {
 	headers: {'Authorization': `Bearer ${await get_spotify_token(userID)}`}
     })
 	.then(res=>res.json())
 	.then(data=>{
-	    console.log(data)
 	    if (data.error?.status == 404) throw Errors.SpotifyCantFind;
 	    return new SongCollection(
 		data.name,
 		`https://open.spotify.com/playlists/${playlist_id}`,
+		data.tracks.total,
 		async function* () {
 		    for (const item of data.tracks.items) {
 			yield titolo_to_details(spotify_track_to_title(item.track));
@@ -246,7 +247,6 @@ async function spotify_playlist(playlist_id, userID){
 		    let next = data.tracks.next;
 		    while (next) {
 			const data = await fetch(next,{headers: {'Authorization': `Bearer ${await get_spotify_token(userID)}`}}).then(res=>res.json());
-			console.log(data);
 			for (const item of data.items) {
 			    yield titolo_to_details(spotify_track_to_title(item.track));
 			}
@@ -270,6 +270,7 @@ async function spotify_album(album_id, userID) {
 	    return new SongCollection(
 		data.name,
 		`https://open.spotify.com/album/${album_id}`,
+		data.tracks.total,
 		async function* () {
 		    for (const item of data.tracks.items) {
 			yield titolo_to_details(spotify_track_to_title(item));
@@ -307,7 +308,7 @@ async function spotify_track(track_id, userID) {
 	throw Errors.SpotifyCantFind;
     }
     const song = await titolo_to_details(spotify_track_to_title(data));
-    return new SongCollection(song.title, song.link, async function*(){yield song});
+    return new SongCollection(song.title, song.link, 1, async function*(){yield song});
 }
 
 function spotify_track_to_title(track){
@@ -337,11 +338,13 @@ async function find_songs(song_query, userID) {
     return await ricerca_titolo(song_query);
 }
 
-async function comando(song_query, position, member, channel) {
+async function* comando(song_query, position, member, channel) {
     const sameVCError = requisiti.sameVoiceChannel(member);
-    if (sameVCError)
-        return sameVCError;
-
+    if (sameVCError){
+        yield sameVCError;
+	return;
+    }
+	
     const guild = member.guild;
 
     if (!servers.has(guild.id))
@@ -353,7 +356,7 @@ async function comando(song_query, position, member, channel) {
     const queued = [];
     const collection = await find_songs(song_query, member.user.id).catch(e=>{return {error:e}});
     if (collection.error){
-	return {
+	yield {
 	    embeds: [
 		new EmbedBuilder()
 		    .setTitle('ERROR')
@@ -366,11 +369,22 @@ async function comando(song_query, position, member, channel) {
 		    }[collection.error])
 	    ]
 	}
+	return;
     }
+    
     for await (const song of collection.generator()) {
+	if (!servers.get(member.guild.id)) break;
 	server.queue.splice(posizione+index,0,song);
 	queued.push(song);
 	index++;
+	if (index%10==0) yield {
+	    embeds: [
+		new EmbedBuilder()
+		    .setTitle("Looking for songs")
+		    .setColor(Colori.system)
+		    .setDescription(`${index}/${collection.size}`)
+	    ]
+	}
 	if (!server.isPlaying) {
 	    server.text_channel = channel;
 	    server.suona(member);
@@ -378,7 +392,7 @@ async function comando(song_query, position, member, channel) {
     }
 
     if (queued.length==1) {
-	return {
+	yield {
 	    embeds: [
                 new EmbedBuilder()
                 .setTitle(`Queued at position ${posizione+1}`)
@@ -386,16 +400,17 @@ async function comando(song_query, position, member, channel) {
                 .setColor(Colori.default)
             ]
         };
-    }else{
-	return {
-            embeds: [
-                new EmbedBuilder()
+	return;
+    }
+    yield {
+        embeds: [
+            new EmbedBuilder()
                 .setTitle(`Queued ${queued.length} songs from position ${posizione+1}`)
                 .setDescription(`__[${collection.title}](${collection.link})__`)
                 .setColor(Colori.default)
-            ]
-        };
-    }
+        ]
+    };
+    return;
 }
 
 module.exports = {
@@ -437,8 +452,9 @@ module.exports = {
 
             await interaction.deferReply({ephemeral:false});
 
-            const response = await comando(song, position, interaction.member, interaction.channel);
-            return await interaction.editReply(response);
+	    for await (const res of comando(song,position,interaction.member, interaction.channel)) {
+		interaction.editReply(res);
+	    }
         },
 
 
@@ -457,9 +473,9 @@ module.exports = {
                 ]
             });
 
-            const response = await comando(canzone, undefined, message.member,message.channel);
-            
-            return await messaggio.edit(response);
+	    for await (const res of comando(canzone, undefined, message.member, message.channel)) {
+		messaggio.edit(res);
+	    }	    
         },
 
         example: '`-play` `song` `[postition]`',
