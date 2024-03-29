@@ -227,11 +227,15 @@ async function spotify_artist(artist_id, userID) {
 }
 
 async function spotify_playlist(playlist_id, userID){
+    console.log("playlist id", playlist_id);
+    console.log(get_spotify_token(userID));
     return await fetch(`https://api.spotify.com/v1/playlists/${playlist_id}`, {
 	headers: {'Authorization': `Bearer ${await get_spotify_token(userID)}`}
     })
 	.then(res=>res.json())
 	.then(data=>{
+	    console.log(data)
+	    if (data.error?.status == 404) throw Errors.SpotifyCantFind;
 	    return new SongCollection(
 		data.name,
 		`https://open.spotify.com/playlists/${playlist_id}`,
@@ -242,9 +246,11 @@ async function spotify_playlist(playlist_id, userID){
 		    let next = data.tracks.next;
 		    while (next) {
 			const data = await fetch(next,{headers: {'Authorization': `Bearer ${await get_spotify_token(userID)}`}}).then(res=>res.json());
-			for (const item of data.tracks.items) {
+			console.log(data);
+			for (const item of data.items) {
 			    yield titolo_to_details(spotify_track_to_title(item.track));
-			}		
+			}
+			next = data.next;
 		    }
 		}
 	    );
@@ -271,10 +277,10 @@ async function spotify_album(album_id, userID) {
 		    let next = data.tracks.next;
 		    while (next) {
 			const data = await fetch(next,{headers: {'Authorization': `Bearer ${await get_spotify_token(userID)}`}}).then(res=>res.json());
-			for (const item of data.tracks.items) {
+			for (const item of data.items) {
 			    yield titolo_to_details(spotify_track_to_title(item));
 			}
-			next = data.tracks.next;
+			next = data.next;
 		    }
 		}
 	    );
@@ -345,7 +351,22 @@ async function comando(song_query, position, member, channel) {
 
     let index = 0;
     const queued = [];
-    const collection = await find_songs(song_query, member.user.id);
+    const collection = await find_songs(song_query, member.user.id).catch(e=>{return {error:e}});
+    if (collection.error){
+	return {
+	    embeds: [
+		new EmbedBuilder()
+		    .setTitle('ERROR')
+		    .setColor(Colori.error)
+		    .setDescription({
+			0: "TitleNotFound",
+			1: "Couldn't find the youtube id of the song",
+			2: "Out youtube key expired",
+			3: "Couldn't find your song on spotify"
+		    }[collection.error])
+	    ]
+	}
+    }
     for await (const song of collection.generator()) {
 	server.queue.splice(posizione+index,0,song);
 	queued.push(song);
