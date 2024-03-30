@@ -387,7 +387,7 @@ async function* comando(song_query, position, member, channel) {
 	}
 	if (!server.isPlaying) {
 	    server.text_channel = channel;
-	    server.suona(member);
+	    await server.suona(member);
 	}
     }
 
