@@ -46,8 +46,16 @@ function playing(guild) {
         }
 }
 
+function playingSameVC(member) {
+    const playingERR = playing(member.guild);
+    if (playingERR) return playingERR;
+    const sameVCErr = sameVoiceChannel(member);
+    if (sameVCErr) return sameVCErr;
+}
+
 module.exports = {
     anyVoiceChannel: anyVoiceChannel,
     sameVoiceChannel: sameVoiceChannel,
-    playing: playing
+    playing: playing,
+    playingSameVC: playingSameVC,
 }
