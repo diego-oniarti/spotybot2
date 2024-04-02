@@ -92,7 +92,7 @@ module.exports = {
                 });
                 return;
             }
-            const reply = await comando(message.member, from, to);
+            const reply = await comando(message.member, from-1, to-1);
             message.channel.send(reply);
         },
 
