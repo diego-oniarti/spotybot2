@@ -20,7 +20,7 @@ function comando(member) {
             clearInterval(interval);
             return;
         }
-        volume += 0.05;
+        volume += volume > 6 ? 0.1 : 0.05;
         server.audioResource?.volume.setVolume(volume);
     }, 250);
     
