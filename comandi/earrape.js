@@ -15,12 +15,12 @@ function comando(member) {
     const server = servers.get(member.guild.id);
     let volume = 1;
     const interval = setInterval(()=>{
-        if (volume>10) {
+        if (volume>8.5) {
             server.audioResource?.volume.setVolume(1);
             clearInterval(interval);
             return;
         }
-        volume += 0.1;
+        volume += 0.05;
         server.audioResource?.volume.setVolume(volume);
     }, 250);
     

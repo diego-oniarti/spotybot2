@@ -64,7 +64,7 @@ get_bot_token();
 
 // Refreshes the bot token for a user. Or returns the bot's token
 async function refresh_spotyfy_token(userID) {
-    if (!userID) return get_bot_token();
+    if (!userID) return await get_bot_token();
     let DB = JSON.parse(fs.readFileSync(DB_PATH));
     if (DB.users[userID]?.refresh_token) {
         console.log("from database");
@@ -201,7 +201,7 @@ async function trova_lista_yt(list_id){
 
 async function trova_link_spotify(resource_id, resource_type, userID){
     // sceglie una funzione e la chiama con dei parametri. I <3 readable code
-    refresh_spotyfy_token(userID);
+    await refresh_spotyfy_token(userID);
     return await {
 	'track': spotify_track,
 	'album': spotify_album,
