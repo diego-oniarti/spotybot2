@@ -10,90 +10,90 @@ async function comando(member, from_index, to_index) {
     if (VCError) return VCError;
 
     const server = servers.get(member.guild.id);
-    
+
     if (from_index<0 || to_index<0 || from_index>=server.queue.length || to_index>server.queue.length) {
-	return {
-	    embeds: [
-		new EmbedBuilder()
-		    .setTitle("Error")
-		    .setColor(Colori.error)
-		    .setDescription("Both parameters must be between 0 and the queue's length")
-	    ]
-	}
+        return {
+            embeds: [
+                new EmbedBuilder()
+                .setTitle("Error")
+                .setColor(Colori.error)
+                .setDescription("Both parameters must be between 0 and the queue's length")
+            ]
+        }
     }
 
     const song = server.queue.splice(from_index, 1)[0];
     if (to_index>from_index) to_index--;
     server.queue.splice(to_index,0,song);
     return {
-	embeds: [
-	    new EmbedBuilder()
-		.setTitle("Song Moved")
-		.setColor(Colori.default)
-	]
+        embeds: [
+            new EmbedBuilder()
+            .setTitle("Song Moved")
+            .setColor(Colori.default)
+        ]
     }
 }
 
 module.exports = {
     comando: new Comando({
         data: new SlashCommandBuilder()
-	    .setName('move')
-            .setDescription('Moved a song from a point in the queue to another')
-            .setDescriptionLocalizations({
-                it: "Sposta una canzone da una posizione all'altra della coda"
+        .setName('move')
+        .setDescription('Moved a song from a point in the queue to another')
+        .setDescriptionLocalizations({
+            it: "Sposta una canzone da una posizione all'altra della coda"
+        })
+        .addIntegerOption(option=>
+            option
+            .setName("from")
+            .setNameLocalizations({
+                it: "da"
             })
-            .addIntegerOption(option=>
-                option
-                    .setName("from")
-                    .setNameLocalizations({
-			it: "da"
-                    })
-                    .setDescription("Index of the song to move")
-                    .setDescriptionLocalizations({
-			it: "Indice della canzone da spostare"
-                    })
-		    .setMinValue(1)
-                    .setRequired(true)
-            )
-            .addIntegerOption(option=>
-                option
-                    .setName("to")
-                    .setNameLocalizations({
-			it: "a"
-                    })
-                    .setDescription("Index where to move the song")
-                    .setDescriptionLocalizations({
-			it: "Destinazione dove muovere la canzone"
-                    })
-                    .setMinValue(1)
-                    .setRequired(true)
-            ),
-        execute: (interaction) => {
+            .setDescription("Index of the song to move")
+            .setDescriptionLocalizations({
+                it: "Indice della canzone da spostare"
+            })
+            .setMinValue(1)
+            .setRequired(true)
+        )
+        .addIntegerOption(option=>
+            option
+            .setName("to")
+            .setNameLocalizations({
+                it: "a"
+            })
+            .setDescription("Index where to move the song")
+            .setDescriptionLocalizations({
+                it: "Destinazione dove muovere la canzone"
+            })
+            .setMinValue(1)
+            .setRequired(true)
+        ),
+        execute: async (interaction) => {
             const from = interaction.options.getInteger("from")-1;
             const to   = interaction.options.getInteger("to")-1;
 
-	    const reply = comando(interaction.member, from, to);
+            const reply = await comando(interaction.member, from, to);
             interaction.reply(reply);
         },
 
 
         aliases: ['move'],
-        executeMsg: (message,args)=>{
-	    let from = Number(args[0]);
-	    let to = Number(args[1]);
-	    if (isNaN(from) || isNaN(to)) {
-		message.channel.send({
-		    embeds: [
-			new EmbedBuilder()
-			    .setTitle("Error")
-			    .setColor(Colori.error)
-			    .setDescription("This command requires two numeric arguments!")
-		    ]
-		});
-		return;
-	    }
-	    const reply = comando(message.member, from, to);
-	    message.channel.send(reply);
+        executeMsg: async (message,args)=>{
+            let from = Number(args[0]);
+            let to = Number(args[1]);
+            if (isNaN(from) || isNaN(to)) {
+                message.channel.send({
+                    embeds: [
+                        new EmbedBuilder()
+                        .setTitle("Error")
+                        .setColor(Colori.error)
+                        .setDescription("This command requires two numeric arguments!")
+                    ]
+                });
+                return;
+            }
+            const reply = await comando(message.member, from, to);
+            message.channel.send(reply);
         },
 
         example: '`-move` `from` `to`',
