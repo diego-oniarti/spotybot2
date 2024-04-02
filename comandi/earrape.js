@@ -16,11 +16,12 @@ function comando(member) {
     let volume = 1;
     const interval = setInterval(()=>{
         if (volume>10) {
-            server.audioResource.volume.setVolume(1);
+            server.audioResource?.volume.setVolume(1);
             clearInterval(interval);
             return;
         }
-        server.audioResource.volume.setVolume(volume);
+        volume += 0.1;
+        server.audioResource?.volume.setVolume(volume);
     }, 250);
     
     return {
