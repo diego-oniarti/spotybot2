@@ -20,7 +20,6 @@ function comando(member) {
             clearInterval(interval);
             return;
         }
-        volume += volume > 6 ? 0.1 : 0.05;
         server.audioResource?.volume.setVolume(volume);
     }, 250);
     
@@ -44,7 +43,7 @@ module.exports = {
         .setDescriptionLocalizations({
             it: "Alza lentamente il volume fino a un livello molto alto"
         }),
-        execute: (interaction) => {
+        execute: async (interaction) => {
             const reply = comando(interaction.member);
             interaction.reply(reply.msg);
         },
