@@ -31,7 +31,8 @@ function comando(member) {
                 new EmbedBuilder()
                 .setColor(Colori.default)
                 .setTitle("Earrape started")
-            ]
+            ],
+            ephemeral: true,
         }
     }
 }
