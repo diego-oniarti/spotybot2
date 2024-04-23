@@ -30,7 +30,7 @@ module.exports = {
         .setDescriptionLocalizations({
             it: "Rimuove tutte le canzoni dalla coda"
         }),
-        execute: (interaction) => {
+        execute: async (interaction) => {
             const reply = comando(interaction.member);
             interaction.reply(reply);
         },

@@ -318,7 +318,7 @@ function spotify_track_to_title(track){
 async function find_songs(song_query, userID) {
     // https://www.youtube.com/watch?v=QN1odfjtMoo&list=PLG7bQTXLuEouQFSnPUY6mFuJRf7ULbZbo
     // https://youtube.com/playlist?list=PLvwkDL8hMpWr2hyMgQwj9wHQINqwpTqWc
-    if (song_query.match(/^https:\/\/youtu\.be\/.{11}$|^https:\/\/(www\.)?youtube\.com\/watch\?v=.{11}$/)){
+    if (song_query.match(/^https:\/\/youtu\.be\/.{11}|^https:\/\/(www\.)?youtube\.com\/watch\?v=.{11}/)){
         const match = song_query.match(/^https:\/\/youtu\.be\/(?<videoId>.{11})$|^https:\/\/(www\.)?youtube\.com\/watch\?v=(?<videoId2>.{11})$/);
         const videoId = match.groups.videoId || match.groups.videoId2;
         return await trova_canzone_yt(videoId);
