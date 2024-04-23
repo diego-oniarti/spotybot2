@@ -451,11 +451,16 @@ module.exports = {
 
             await interaction.deferReply({ephemeral:false});
 
-            let resolved = true;
+            let old_message_resolved = true;
+            let timer_resolved = true;
             for await (const res of comando(song,position,interaction.member, interaction.channel)) {
-                if (resolved) {
-                    resolved=false;
-                    interaction.editReply(res).then(resolved=true);
+                if (old_message_resolved && timer_resolved) {
+                    old_message_resolved=false;
+                    timer_resolved=false;
+                    interaction.editReply(res).then(old_message_resolved=true);
+                    setTimeout(()=>{
+                        timer_resolved=true;
+                    },2500);
                 }
             }
         },
@@ -476,11 +481,16 @@ module.exports = {
                 ]
             });
 
-            let resolved = true;
+            let old_message_resolved = true;
+            let timer_resolved = true;
             for await (const res of comando(canzone, undefined, message.member, message.channel)) {
-                if (resolved) {
-                    resolved = false;
-                    messaggio.edit(res).then(resolved=true);
+                if (old_message_resolved && timer_resolved) {
+                    old_message_resolved=false;
+                    timer_resolved=false;
+                    messaggio.edit(res).then(old_message_resolved=true);
+                    setTimeout(()=>{
+                        timer_resolved=true;
+                    },2500);
                 }
             }	    
         },

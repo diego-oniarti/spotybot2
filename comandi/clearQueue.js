@@ -31,7 +31,7 @@ module.exports = {
             it: "Rimuove tutte le canzoni dalla coda"
         }),
         execute: (interaction) => {
-            const reply = comando(interaction.member, from, to);
+            const reply = comando(interaction.member);
             interaction.reply(reply);
         },
 
