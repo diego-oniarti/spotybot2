@@ -1,4 +1,5 @@
 .env
 node_modules
 canzoni/
+out/
 DB.json
