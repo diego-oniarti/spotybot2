@@ -25,7 +25,11 @@ const Errors = {
     SpotifyCantFind: 3,
 }
 
-/** The data rappresenting a song. */
+/** The data rappresenting a song. 
+ * @property {string} link - The youtube link to the song
+ * @property {string} titolo - The title of the song as found on youtube
+ * @property {bool} file - Whether or not this song has been uploaded via a file
+ */
 class SongDetails {
     /**
      * @param {string} link - The youtube link of the song.
@@ -57,10 +61,15 @@ class SongCollection {
     }
 }
 
+/**
+ * @typedef {Object} style
+ * @property {string} format - The template to use when generating a progress bar
+ */
+
 /** 
  * Get the style for a progress bar given its name. 
  * @param {String} nome The title of the progress bar.
- * @returns {Object}
+ * @returns {style} style - The style to assign to a progress bar.
  */
 function bar_style(nome) {
     if (nome) nome+=' ';
@@ -283,6 +292,11 @@ async function trova_link_spotify(resource_id, resource_type, userID){
     }[resource_type](resource_id, userID);
 }
 
+/**
+ * @param {string} artist_id - The spotify id for the artist
+ * @param {string} userID - The user's discord id.
+ * @returns {Promise<SongCollection>}
+ */
 async function spotify_artist(artist_id, userID) {
     let artist_name="";
     await fetch(`https://api.spotify.com/v1/artists/${artist_id}`, {
@@ -302,6 +316,11 @@ async function spotify_artist(artist_id, userID) {
     );
 }
 
+/**
+ * @param {string} playlist_id - The spotify id for the playlist
+ * @param {string} userID - The user's discord id.
+ * @returns {Promise<SongCollection>}
+ */
 async function spotify_playlist(playlist_id, userID){
     return await fetch(`https://api.spotify.com/v1/playlists/${playlist_id}`, {
         headers: {'Authorization': `Bearer ${await get_spotify_token(userID)}`}
@@ -334,6 +353,11 @@ async function spotify_playlist(playlist_id, userID){
         });
 }
 
+/**
+ * @param {string} album_id - The spotify id for the album
+ * @param {string} userID - The user's discord id.
+ * @returns {Promise<SongCollection>}
+ */
 async function spotify_album(album_id, userID) {
     return await fetch(`https://api.spotify.com/v1/albums/${album_id}`, {
         headers: {'Authorization': `Bearer ${await get_spotify_token(userID)}`}
@@ -365,6 +389,11 @@ async function spotify_album(album_id, userID) {
         });
 }
 
+/**
+ * @param {string} track_id - The spotify id for the track
+ * @param {string} userID - The user's discord id.
+ * @returns {Promise<SongCollection>}
+ */
 async function spotify_track(track_id, userID) {
     const res = await fetch(`https://api.spotify.com/v1/tracks/${track_id}`,{
         headers: {
@@ -384,6 +413,10 @@ async function spotify_track(track_id, userID) {
     return new SongCollection(song.title, song.link, 1, async function*(){yield song});
 }
 
+/**
+ * Given a track, returns it's title followed by the names of all the authors separated by spaces.
+ * @param {string} track
+ */
 function spotify_track_to_title(track){
     return [track.name, ...track.artists.map(artist=>artist.name)].join(' ');
 }
