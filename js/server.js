@@ -29,108 +29,111 @@ class Server {
         this.pastSongs = [];
     }
     async suona(member) {
-	this.isPlaying = true;
-	let connection = Discord.getVoiceConnection(this.guild.id);
-	const canzone = this.queue.shift();
-	this.corrente = canzone;
-	const yt_stream = await stream(canzone.link, {
-	    discordPlayerCompatibility: true,
-	});
-	const resource = Discord.createAudioResource(yt_stream.stream, {
-	    inlineVolume: true,
-	    inputType: yt_stream.type
-	});
-	const player = Discord.createAudioPlayer({
-	    behaviors: {
-		noSubscriber: Discord.NoSubscriberBehavior.Play,
-	    }
-	});
-	this.audioPlayer = player;
-	this.audioResource = resource;
-	
-	if (!connection) {
-	    const channel = member.voice.channel;
-	    connection = Discord.joinVoiceChannel({
-		channelId: channel.id,
-		guildId: member.guild.id,
-		adapterCreator: member.guild.voiceAdapterCreator
-	    });
-	}
+        this.isPlaying = true;
+        let connection = Discord.getVoiceConnection(this.guild.id);
+        const canzone = this.queue.shift();
+        this.corrente = canzone;
+        const yt_stream = await stream(canzone.link, {
+            discordPlayerCompatibility: true,
+        });
+        const resource = Discord.createAudioResource(yt_stream.stream, {
+            inlineVolume: true,
+            inputType: yt_stream.type
+        });
+        const player = Discord.createAudioPlayer({
+            behaviors: {
+                noSubscriber: Discord.NoSubscriberBehavior.Play,
+            }
+        });
+        const volume = this.resource?.volume?.volume || 0.1;
 
-	player.play(resource);
-	connection.subscribe(player);
+        resource.volume?.setVolume(volume);
+        this.audioPlayer = player;
+        this.audioResource = resource;
 
-	const networkStateChangeHandler = (oldNetworkState, newNetworkState) => {
+        if (!connection) {
+            const channel = member.voice.channel;
+            connection = Discord.joinVoiceChannel({
+                channelId: channel.id,
+                guildId: member.guild.id,
+                adapterCreator: member.guild.voiceAdapterCreator
+            });
+        }
+
+        player.play(resource);
+        connection.subscribe(player);
+
+        const networkStateChangeHandler = (oldNetworkState, newNetworkState) => {
             const newUdp = Reflect.get(newNetworkState, 'udp');
             clearInterval(newUdp?.keepAliveInterval);
-	}
-	
-	player.on('stateChange', (oldState, newState)=>{
+        }
+
+        player.on('stateChange', (oldState, newState)=>{
             Reflect.get(oldState, 'networking')?.off('stateChange', networkStateChangeHandler);
             Reflect.get(newState, 'networking')?.on('stateChange', networkStateChangeHandler);
-	});
-	
-	player.on(Discord.AudioPlayerStatus.Idle, ()=>{
+        });
+
+        player.on(Discord.AudioPlayerStatus.Idle, ()=>{
             this.fine_canzone();
-	});
-	player.on('error',(err)=>{
+        });
+        player.on('error',(err)=>{
             console.log("ERROR")
             console.log(err);
             this.errore_canzone();
-	});
+        });
 
-	this.text_channel.send({
-	    embeds: [
-		new EmbedBuilder()
-		    .setTitle("Now Playing")
-		    .setColor(Colori.default)
-		    .setDescription(`__[${canzone.titolo}](${canzone.link})__`)
-	    ]
-	});
+        this.text_channel.send({
+            embeds: [
+                new EmbedBuilder()
+                .setTitle("Now Playing")
+                .setColor(Colori.default)
+                .setDescription(`__[${canzone.titolo}](${canzone.link})__`)
+            ]
+        });
     }
     async fine_canzone() {
-	switch (this.mode) {
-	case Modes.none:
-	case Modes.loopQueue:
-	    this.pastSongs.push(this.corrente);
-	    break;
-	case Modes.loopQueueFromNow:
-	    this.queue.push(this.corrente);
-	    break;
-	case Modes.loopSong:
-	    this.queue.unshift(this.corrente);
-	    break;
-	}
+        switch (this.mode) {
+            case Modes.none:
+            case Modes.loopQueue:
+                this.pastSongs.push(this.corrente);
+                break;
+            case Modes.loopQueueFromNow:
+                this.queue.push(this.corrente);
+                break;
+            case Modes.loopSong:
+                this.queue.unshift(this.corrente);
+                break;
+        }
 
-	this.audioPlayer?.removeAllListeners();
-	this.audioPlayer?.stop(true);
-	this.audioResource=null;
+        this.audioPlayer?.removeAllListeners();
+        this.audioPlayer?.stop(true);
+        this.audioResource=null;
 
-	// se il bot è in un canale e ci sono ancora canzoni incoda suonale
-	const connection = Discord.getVoiceConnection(this.guild.id);
+        // se il bot è in un canale e ci sono ancora canzoni incoda suonale
+        const connection = Discord.getVoiceConnection(this.guild.id);
         if (connection) {
             const voiceChannelId = connection.joinConfig.channelId;
             const voiceChannel = await this.guild.channels.fetch(voiceChannelId);
 
             if (this.queue.length>0 && voiceChannel.members.size>1) {
-		this.suona();
-		return;
+                this.suona();
+                return;
             }
         }
 
         // lascia il canale
-	console.log("leaving channel");
-	connection?.disconnect();
-	connection?.destroy();
+        console.log("leaving channel");
+        connection?.disconnect();
+        connection?.destroy();
         this.isPlaying=false;
         this.audioResource = undefined;
         this.pastSongs.push(...this.queue);
         this.mode = Modes.none;
 
-	servers.delete(this.guild.id);
+        servers.delete(this.guild.id);
     }
     errore_canzone() {
-	this.fine_canzone();
+        this.fine_canzone();
     }
 }
 
