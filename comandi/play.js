@@ -31,12 +31,14 @@ class SongDetails {
     /**
      * @param {string} link - The youtube link of the song.
      * @param {string} titolo - The title of the song.
+     * @param {string} yt_id - The youtube id to the song.
      * @param {boolean} [file=false] - Whether or not the song is a file. Defaults to false.
      */
     constructor(link, titolo, file=false) {
         this.link = link;
         this.titolo = titolo;
         this.file = file;
+	this.yt_id;
     }
 }
 
@@ -241,6 +243,7 @@ async function get_song_details(song_id) {
     return new SongDetails(
         `https://www.youtube.com/watch?v=${item.id}`,
         item.snippet.title,
+	item.id,
     );
 }
 
@@ -319,7 +322,8 @@ async function trova_lista_yt(list_id){
             for (const item of items) {
                 yield new SongDetails(
                     `https://www.youtube.com/watch?v=${item.snippet.resourceId.videoId}`, 
-                    item.snippet.title
+                    item.snippet.title,
+		    item.snippet.resourceId.videoId,
                 );
             }
         }while(has_next_page);
