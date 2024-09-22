@@ -20,6 +20,7 @@
     "opusscript": "^0.0.8",
     "play-dl": "^1.9.7",
     "sodium-native": "^4.0.4",
+    "sql.js": "^1.11.0",
     "ytdl-core": "^4.11.5"
   }
 }

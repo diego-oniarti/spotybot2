@@ -3,3 +3,4 @@ node_modules
 canzoni/
 out/
 DB.json
+database.db

@@ -1,23 +1,14 @@
+require('sql.js');
 const express = require('express')
 const querystring = require('querystring')
-const fs = require('node:fs');
 const path = require('node:path');
 const app = express()
 const cookieParser = require('cookie-parser');
+const { db_ref, save_db } = require('./shared');
 
 require('dotenv').config();
 
 const PORT = process.env.PORT;
-const DB_PATH = process.env.DB_PATH
-
-if (!fs.existsSync(DB_PATH)) {
-    fs.writeFileSync(DB_PATH, JSON.stringify(
-        {
-            users: {}
-        }
-    ));
-}
-
 
 app.set('view engine', 'ejs'); 
 app.use(cookieParser());
@@ -80,14 +71,26 @@ app.get('/auth', (req, res) => {
         const userID = req.cookies.user;
         const access_token = data.access_token;
         const refresh_token =data.refresh_token;
-        const DB = JSON.parse(fs.readFileSync(DB_PATH));
-        
-        if (!DB.users[userID]) DB.users[userID]={}
-        DB.users[userID].access_token = access_token;
-        DB.users[userID].refresh_token = refresh_token;
-        fs.writeFileSync(DB_PATH, JSON.stringify(DB));
+
+        // const DB = JSON.parse(fs.readFileSync(DB_PATH));
+        // if (!DB.users[userID]) DB.users[userID]={}
+        // DB.users[userID].access_token = access_token;
+        // DB.users[userID].refresh_token = refresh_token;
+        // fs.writeFileSync(DB_PATH, JSON.stringify(DB));
+
+        const db = await db_ref;
+        const insert_statement = db.prepare("INSERT INTO users (user_id, access_token, refresh_token) VALUES (?, ?, ?)");
+        insert_statement.run([userID, access_token, refresh_token]);
+        insert_statement.free();
+        save_db();
     })
 });
+
+app.get('/test', async (_,res)=>{
+    console.log((await db_ref).run);
+    console.log(save_db);
+    res.sendStatus(200);
+})
 
 app.use('/', express.static(path.join(__dirname, 'public')));
 

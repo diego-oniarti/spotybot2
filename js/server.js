@@ -1,6 +1,4 @@
 const Discord = require('@discordjs/voice');
-const ytdl = require('ytdl-core');
-const { OpusEncoder } = require('@discordjs/opus');
 const { stream } = require('play-dl');
 const { EmbedBuilder } = require('discord.js');
 const { Colori } = require('./colori');

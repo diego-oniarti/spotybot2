@@ -2,16 +2,13 @@ require('dotenv').config();
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const Comando = require('../js/comando');
 const { Colori } = require('../js/colori');
-const fs = require('node:fs');
 const fetch = require('node-fetch');
-const { servers } = require('../shared');
+const { servers, db_ref, save_db } = require('../shared');
 const { Server } = require('../js/server');
-const cliProgress = require('cli-progress');
 const querystring = require('node:querystring');
 const requisiti = require('../js/requisiti');
 const play = require('play-dl');
 
-const DB_PATH = process.env.DB_PATH;
 const youtube_key = process.env.YOUTUBE_KEY;
 
 /** The bot's spotify token */
@@ -87,11 +84,24 @@ function bar_style(nome) {
 async function get_spotify_token(userID) {
     if (!userID) return spotifyToken;
 
-    const DB = JSON.parse(fs.readFileSync(DB_PATH));
-    if (DB.users[userID]?.access_token) {
-        return DB.users[userID].access_token;
+    const db = await db_ref;
+    const select_query = db.prepare("SELECT access_token FROM users WHERE user_id=?");
+    select_query.bind([userID]);
+
+    let ret = spotifyToken;
+    if (select_query.step()) {
+        const user = select_query.getAsObject();
+        ret = user.access_token;
     }
-    return spotifyToken;
+    select_query.free();
+    save_db();
+    return ret;
+
+    // const DB = JSON.parse(fs.readFileSync(DB_PATH));
+    // if (DB.users[userID]?.access_token) {
+    //     return DB.users[userID].access_token;
+    // }
+    // return spotifyToken;
 }
 
 /** 
@@ -127,16 +137,24 @@ async function refresh_spotyfy_token(userID) {
         await get_bot_token();
         return;
     }
-    let DB = JSON.parse(fs.readFileSync(DB_PATH));
-    if (!DB.users[userID]?.refresh_token) {
-        console.log("from bot")
+
+    const db = await db_ref;
+    const user_statement = db.prepare(`SELECT * FROM users WHERE user_id=${userID}`);
+    user_statement.bind([userID]);
+    if (!user_present.step()) {
+        console.log("from bot");
+        user_statement.free();
         await get_bot_token();
         return;
     }
     console.log("from database");
+
+    const user = user_statement.getAsObject();
+
     const params = new URLSearchParams();
     params.append('grant_type', 'refresh_token');
-    params.append('refresh_token', DB.users[userID].refresh_token);
+    params.append('refresh_token', user.refresh_token);
+    user_statement.free();
 
     const res = await fetch('https://accounts.spotify.com/api/token', {
         method: 'POST',
@@ -147,10 +165,43 @@ async function refresh_spotyfy_token(userID) {
         body: params,
     });
     const data = await res.json();
-    DB = JSON.parse(fs.readFileSync(DB_PATH));
-    DB.users[userID].access_token = data.access_token;
-    if (data.refresh_token) DB.users[userID].refresh_token = data.refresh_token;
-    fs.writeFileSync(DB_PATH, JSON.stringify(DB));
+
+    const update_access_statement = db.prepare("UPDATE users SET access_token=? WHERE user_id=?");
+    update_access_statement.run([data.access_token, userID]);
+    update_access_statement.free();
+
+    if (data.refresh_token) {
+        const update_refresh_statement = db.prepare("UPDATE users SET refresh_token=? WHERE user_id=?");
+        update_refresh_statement.run([data.refresh_token, userID]);
+        update_refresh_statement.free();
+    }
+
+    save_db();
+
+    // let DB = JSON.parse(fs.readFileSync(DB_PATH));
+    // if (!DB.users[userID]?.refresh_token) {
+    //     console.log("from bot")
+    //     await get_bot_token();
+    //     return;
+    // }
+    // console.log("from database");
+    // const params = new URLSearchParams();
+    // params.append('grant_type', 'refresh_token');
+    // params.append('refresh_token', DB.users[userID].refresh_token);
+
+    // const res = await fetch('https://accounts.spotify.com/api/token', {
+    //     method: 'POST',
+    //     headers: {
+    //         'Authorization': 'Basic ' + (new Buffer.from(process.env.SPOTIFY_CLIENT_ID + ':' + process.env.SPOTIFY_CLIENT_SECRET).toString('base64')),
+    //         'Content-Type': 'application/x-www-form-urlencoded'
+    //     },
+    //     body: params,
+    // });
+    // const data = await res.json();
+    // DB = JSON.parse(fs.readFileSync(DB_PATH));
+    // DB.users[userID].access_token = data.access_token;
+    // if (data.refresh_token) DB.users[userID].refresh_token = data.refresh_token;
+    // fs.writeFileSync(DB_PATH, JSON.stringify(DB));
 }
 
 /**
