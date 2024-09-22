@@ -8,10 +8,10 @@ let db_ref = new Promise((res) => {
     resolver = res;
 });
 
+const db_path = process.env.DB_PATH;
 async function initDatabase() {
     const SQL = await initSqlJs();
 
-    const db_path = process.env.DB_PATH;
     if (fs.existsSync(db_path)) {
         const fileBuffer = fs.readFileSync(db_path);
         var new_db = new SQL.Database(fileBuffer);
@@ -19,21 +19,21 @@ async function initDatabase() {
     } else {
         var new_db = new SQL.Database();
         console.log("Creating database");
-        db.run(`
+        new_db.run(`
             CREATE TABLE users (
                 user_id TEXT PRIMARY KEY,
                 access_token TEXT,
                 refresh_token TEXT
             )
         `);
-        db.run(`
+        new_db.run(`
             CREATE TABLE songs (
                 song_id TEXT PRIMARY KEY,
                 location TEXT,
                 last_used date DEFAULT current_timestamp
             )
         `);
-        const data = db.export();
+        const data = new_db.export();
         fs.writeFileSync(db_path, Buffer.from(data));
     }
     return new_db;
@@ -45,8 +45,10 @@ initDatabase().then((new_db)=>{
 });
 
 function save_db() {
-    const data = db.export();
-    fs.writeFileSync(db_path, Buffer.from(data));
+    db_ref.then(db=>{
+	const data = db.export();
+	fs.writeFileSync(db_path, Buffer.from(data));
+    }) 
 }
 
 const servers = new Map();
