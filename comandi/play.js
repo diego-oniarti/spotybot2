@@ -123,9 +123,9 @@ async function refresh_spotyfy_token(userID) {
     }
 
     const db = await db_ref;
-    const user_statement = db.prepare(`SELECT * FROM users WHERE user_id=${userID}`);
+    const user_statement = db.prepare(`SELECT * FROM users WHERE user_id=?`);
     user_statement.bind([userID]);
-    if (!user_present.step()) {
+    if (!user_statement.step()) {
         console.log("from bot");
         user_statement.free();
         await get_bot_token();
@@ -498,20 +498,22 @@ async function* comando(song_query, position, member, channel) {
     const queued = [];
     const collection = await find_songs(song_query, member.user.id).catch(e=>{return {error:e}});
     if (collection.error){
-        yield {
-            embeds: [
-                new EmbedBuilder()
-                .setTitle('ERROR')
-                .setColor(Colori.error)
-                .setDescription({
-                    [Errors.TitleNotFound]: "Couldn't find the song on youtube.\nOr the link may be malformed",
-                    [Errors.IdNotFound]: "Couldn't find the youtube id of the song",
-                    [Errors.YoutubeKeyExpired]: "Our youtube key expired",
-                    [Errors.SpotifyCantFind]: "Couldn't find your song on spotify"
-                }[collection.error])
-            ]
-        }
-        return;
+	console.log(collection.error);
+	const error_msg = {
+	    [Errors.TitleNotFound]: "Couldn't find the song on youtube.\nOr the link may be malformed",
+	    [Errors.IdNotFound]: "Couldn't find the youtube id of the song",
+	    [Errors.YoutubeKeyExpired]: "Our youtube key expired",
+	    [Errors.SpotifyCantFind]: "Couldn't find your song on spotify"
+	}[collection.error] 
+	yield {
+	    embeds: [
+		new EmbedBuilder()
+		.setTitle('ERROR')
+		.setColor(Colori.error)
+		.setDescription(error_msg?error_msg:"Unknown Error")
+	    ]
+	}
+	return;
     }
 
     for await (const song of collection.generator()) {
