@@ -1,15 +1,13 @@
 const initSqlJs = require('sql.js');
 const fs = require('fs');
 require("dotenv").config();
-
-let resolver;
-/** @type {Promise<Database>} */
-let db_ref = new Promise((res) => {
-    resolver = res;
-});
-
 const db_path = process.env.DB_PATH;
-async function initDatabase() {
+
+
+/**
+ * Reads the database from a file or creates a new one
+ */
+async function init_database() {
     const SQL = await initSqlJs();
 
     if (fs.existsSync(db_path)) {
@@ -39,10 +37,7 @@ async function initDatabase() {
     return new_db;
 }
 
-initDatabase().then((new_db)=>{
-    console.log("Database ready");
-    resolver(new_db);
-});
+const db_ref = init_database();
 
 function save_db() {
     db_ref.then(db=>{

@@ -22,5 +22,8 @@
     "sodium-native": "^4.0.4",
     "sql.js": "^1.11.0",
     "ytdl-core": "^4.11.5"
+  },
+  "devDependencies": {
+    "@types/sql.js": "^1.4.9"
   }
 }

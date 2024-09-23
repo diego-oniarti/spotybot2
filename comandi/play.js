@@ -38,7 +38,7 @@ class SongDetails {
         this.link = link;
         this.titolo = titolo;
         this.file = file;
-	this.yt_id;
+        this.yt_id = link.match(/https:\/\/www.youtube.com\/watch\?v\=(.{11})/)[1];
     }
 }
 
@@ -57,24 +57,6 @@ class SongCollection {
         this.link = link;
         this.generator=generator;
         this.size = size;
-    }
-}
-
-/**
- * @typedef {Object} style
- * @property {string} format - The template to use when generating a progress bar
- */
-
-/** 
- * Get the style for a progress bar given its name. 
- * @param {String} nome The title of the progress bar.
- * @returns {style} style - The style to assign to a progress bar.
- */
-function bar_style(nome) {
-    if (nome) nome+=' ';
-    else nome=''
-    return {
-        format: `${nome}|{bar}| {percentage}% | DURATION: {duration} | ETA: {eta}s | {value}/{total}`,
     }
 }
 
