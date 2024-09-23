@@ -82,27 +82,27 @@ async function check_cleanup() {
     const db = await db_ref;
     const total_size_query = db.exec("SELECT sum(size) FROM songs");
     const total_size = total_size_query[0].values[0][0];
-    if (total_size < 1048576) return;
+    if (total_size < 10485760) return;
     console.log("10GB exceeded");
 
     const to_be_removed = [];
     let size = total_size;
     const ordered_query = db.prepare("SELECT * FROM songs ORDER BY last_used");
     while (ordered_query.step() && size > 5242880) {
-	const row = ordered_query.getAsObject();
-	size -= parseInt(ordered_query.size);
-	to_be_removed.push({
-	    "location": row.location,
-	    "id": row.song_id,
-	});
+        const row = ordered_query.getAsObject();
+        size -= parseInt(row.size);
+        to_be_removed.push({
+            "location": row.location,
+            "id": row.song_id,
+        });
     }
     ordered_query.free()
 
     const remove_query = db.prepare("DELETE FROM songs WHERE song_id=?");
     for (let song of to_be_removed) {
-	console.log(`Removing: ${song.id}`);
-	fs.rmSync(song.location);
-	remove_query.run([song.id]);
+        console.log(`Removing: ${song.id}`);
+        fs.rmSync(song.location);
+        remove_query.run([song.id]);
     }
     remove_query.free();
 }
