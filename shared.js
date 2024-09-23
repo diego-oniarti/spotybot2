@@ -28,6 +28,7 @@ async function init_database() {
             CREATE TABLE songs (
                 song_id TEXT PRIMARY KEY,
                 location TEXT,
+		size INT,
                 last_used date DEFAULT current_timestamp
             )
         `);

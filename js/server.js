@@ -4,6 +4,7 @@ const { Colori } = require('./colori');
 const { servers, db_ref, save_db } = require('../shared');
 const path = require('node:path');
 const { spawn } = require('child_process');
+const fs = require("node:fs");
 require("dotenv").config();
 
 const SONGS_PATH = process.env.SONGS_PATH;
@@ -73,6 +74,40 @@ function download_song(yt_id) {
 }
 
 /**
+ * Checks if the song folder exceeded 10GB. 
+ * If it did, removes old songs until the folder is down to 5GB.
+ * Feature not already tested
+ */
+async function check_cleanup() {
+    const db = await db_ref;
+    const total_size_query = db.exec("SELECT sum(size) FROM songs");
+    const total_size = total_size_query[0].values[0][0];
+    if (total_size < 1048576) return;
+    console.log("10GB exceeded");
+
+    const to_be_removed = [];
+    let size = total_size;
+    const ordered_query = db.prepare("SELECT * FROM songs ORDER BY last_used");
+    while (ordered_query.step() && size > 5242880) {
+	const row = ordered_query.getAsObject();
+	size -= parseInt(ordered_query.size);
+	to_be_removed.push({
+	    "location": row.location,
+	    "id": row.song_id,
+	});
+    }
+    ordered_query.free()
+
+    const remove_query = db.prepare("DELETE FROM songs WHERE song_id=?");
+    for (let song of to_be_removed) {
+	console.log(`Removing: ${song.id}`);
+	fs.rmSync(song.location);
+	remove_query.run([song.id]);
+    }
+    remove_query.free();
+}
+
+/**
  * Gets the location of a song file. If the song is not saved already it is downloaded first and added to the database.
  * 
  * @param {string} yt_id - The 11 characters long youtube id of the video
@@ -95,10 +130,14 @@ async function get_song(yt_id) {
     }
 
     const location = await download_song(yt_id);
-    const upload_statement = db.prepare("INSERT INTO songs (song_id, location) VALUES (?, ?)");
-    upload_statement.run([yt_id, location]);
+    const stat = fs.statSync(location);
+    const size = Math.ceil(stat.size/1024);
+    const upload_statement = db.prepare("INSERT INTO songs (song_id, location, size) VALUES (?, ?, ?)");
+    upload_statement.run([yt_id, location, size]);
     upload_statement.free();
     save_db();
+
+    check_cleanup();
     return location;
 }
 
