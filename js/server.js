@@ -170,9 +170,11 @@ class Server {
 		noSubscriber: Discord.NoSubscriberBehavior.Play,
 	    }
 	});
-	const volume = this.resource?.volume?.volume || 0.1;
 
-	resource.volume?.setVolume(volume);
+	// const volume = this.resource?.volume?.volume || 0.1;
+	//
+	// resource.volume?.setVolume(volume);
+
 	this.audioPlayer = player;
 	this.audioResource = resource;
 
