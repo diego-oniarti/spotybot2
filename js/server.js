@@ -74,21 +74,21 @@ function download_song(yt_id) {
 }
 
 /**
- * Checks if the song folder exceeded 10GB. 
- * If it did, removes old songs until the folder is down to 5GB.
+ * Checks if the song folder exceeded 5GB. 
+ * If it did, removes old songs until the folder is down to 2.5GB.
  * Feature not already tested
  */
 async function check_cleanup() {
     const db = await db_ref;
     const total_size_query = db.exec("SELECT sum(size) FROM songs");
     const total_size = total_size_query[0].values[0][0];
-    if (total_size < 10485760) return;
+    if (total_size < 5242880) return;
     console.log("10GB exceeded");
 
     const to_be_removed = [];
     let size = total_size;
     const ordered_query = db.prepare("SELECT * FROM songs ORDER BY last_used");
-    while (ordered_query.step() && size > 5242880) {
+    while (ordered_query.step() && size > 2621440) {
         const row = ordered_query.getAsObject();
         size -= parseInt(row.size);
         to_be_removed.push({
