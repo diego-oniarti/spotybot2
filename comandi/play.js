@@ -20,6 +20,7 @@ const Errors = {
     IdNotFound: 1,
     YoutubeKeyExpired: 2,
     SpotifyCantFind: 3,
+    VideoTooLong: 4,
 }
 
 /** The data rappresenting a song. 
@@ -209,23 +210,37 @@ async function titolo_to_id(song_title) {
     }
 }
 
+/** 
+ * Data una durata di tempo in formato ISO, stabilisce se è valida e inferiore a 40 minuti
+ * @param {string} ISO_duration
+ * @returns {boolean}
+ */
+function check_duration(ISO_duration) {
+    const reg = /PT((?<minutes>\d+)M)?((?<seconds>\d+)S)?/;
+    const m = ISO_duration.match(reg);
+    return (m && parseInt(m.groups.minutes) < 40);
+}
+
 /**
  * Takes the youtube id of a song and returns its details
  * @param {string} song_id - The youtube id of a song.
  * @returns {Promise<SongDetails>} - The details of the song
  */
 async function get_song_details(song_id) {
-    const res = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${song_id}&key=${youtube_key}`);
+    const res = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails&id=${song_id}&key=${youtube_key}`);
     if (!res.ok) throw Errors.IdNotFound;
     const snippet = await res.json();
     const item = snippet.items[0];
     if (!item){
         throw Errors.IdNotFound;
     }
+    const ISO_duration = item.contentDetails.duration;
+    if (!check_duration(ISO_duration)) throw Errors.VideoTooLong;
+
     return new SongDetails(
         `https://www.youtube.com/watch?v=${item.id}`,
         item.snippet.title,
-	item.id,
+        item.id,
     );
 }
 
@@ -284,7 +299,7 @@ async function trova_lista_yt(list_id){
         do {
             has_next_page = false;
             const params = {
-                part: 'snippet',
+                part: 'snippet,contentDetails',
                 maxResults: 50,
                 playlistId: list_id,
                 key: youtube_key,
@@ -299,13 +314,15 @@ async function trova_lista_yt(list_id){
                 has_next_page = true;
             }
 
-            const items = snippet.items;
+            const items = snippet.items.filter(item=>{
+                return check_duration(item.contentDetails.duration);
+            });
 
             for (const item of items) {
                 yield new SongDetails(
                     `https://www.youtube.com/watch?v=${item.snippet.resourceId.videoId}`, 
                     item.snippet.title,
-		    item.snippet.resourceId.videoId,
+                    item.snippet.resourceId.videoId,
                 );
             }
         }while(has_next_page);
@@ -498,22 +515,23 @@ async function* comando(song_query, position, member, channel) {
     const queued = [];
     const collection = await find_songs(song_query, member.user.id).catch(e=>{return {error:e}});
     if (collection.error){
-	console.log(collection.error);
-	const error_msg = {
-	    [Errors.TitleNotFound]: "Couldn't find the song on youtube.\nOr the link may be malformed",
-	    [Errors.IdNotFound]: "Couldn't find the youtube id of the song",
-	    [Errors.YoutubeKeyExpired]: "Our youtube key expired",
-	    [Errors.SpotifyCantFind]: "Couldn't find your song on spotify"
-	}[collection.error] 
-	yield {
-	    embeds: [
-		new EmbedBuilder()
-		.setTitle('ERROR')
-		.setColor(Colori.error)
-		.setDescription(error_msg?error_msg:"Unknown Error")
-	    ]
-	}
-	return;
+        console.log(collection.error);
+        const error_msg = {
+            [Errors.TitleNotFound]: "Couldn't find the song on youtube.\nOr the link may be malformed",
+            [Errors.IdNotFound]: "Couldn't find the youtube id of the song",
+            [Errors.YoutubeKeyExpired]: "Our youtube key expired",
+            [Errors.SpotifyCantFind]: "Couldn't find your song on spotify",
+            [Errors.VideoTooLong]: "The video is too long to be loaded",
+        }[collection.error] 
+        yield {
+            embeds: [
+                new EmbedBuilder()
+                .setTitle('ERROR')
+                .setColor(Colori.error)
+                .setDescription(error_msg?error_msg:"Unknown Error")
+            ]
+        }
+        return;
     }
 
     for await (const song of collection.generator()) {
