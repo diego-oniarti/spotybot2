@@ -12,7 +12,8 @@ SPOTIFY_CLIENT_ID= Your spotify client id \\
 SPOTIFY_CLIENT_SECRET= Your spotify client secret \\
 PORT= The port for the webserver. User for OAuth \\
 REDIRECT_URI= The redirect URI for the spotify OAuth \\
-DB_PATH= The path to a json file
+DB_PATH= The path to a json file \\
+SONGS_PATH= The path to the folder containing the songs. This will go under the js/ directory. 
 
 # TODO
 - Fix the youtbe playlist regex in [play.js](https://github.com/diego-oniarti/spotybot2/blob/main/comandi/play.js):find_songs.
