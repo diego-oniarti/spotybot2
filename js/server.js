@@ -36,9 +36,11 @@ const downloading = new Map();
 function download_song(yt_id) {
     // se la canzone sta già venendo scaricata per un altro motivo, usa la stessa promise
     if (downloading.has(yt_id)) {
+	console.log("Already downloading (1)");
         return downloading.get(yt_id);
     }
 
+    console.log("Starting download");
     const ret = new Promise((resolve, err)=>{
         const child = spawn("yt-dlp", [
             "-x",
@@ -139,6 +141,12 @@ async function get_song(yt_id) {
         song_query.free();
         save_db();
         return song_path;
+    }
+
+    // If you're the second to ask for a song, the other is gonna write on the db
+    if (downloading.has(yt_id)) {
+	console.log("Already downloading (1)");
+	return await downloading.get(yt_id);
     }
 
     const location = await download_song(yt_id);
