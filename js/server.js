@@ -17,22 +17,29 @@ const Modes = {
     loopQueueFromNow: 5
 }
 
-/*
-[youtube] Extracting URL: https://www.youtube.com/watch?v=Yi5r5l8OSZs
-[youtube] Yi5r5l8OSZs: Downloading webpage
-[youtube] Yi5r5l8OSZs: Downloading ios player API JSON
-[youtube] Yi5r5l8OSZs: Downloading web creator player API JSON
-[youtube] Yi5r5l8OSZs: Downloading m3u8 information
-[info] Yi5r5l8OSZs: Downloading 1 format(s): 251
-[download] Destination: test/Yi5r5l8OSZs
-[download] 100% of    2.72MiB in 00:00:00 at 3.27MiB/s
-[ExtractAudio] Destination: test/Yi5r5l8OSZs.opus
-Deleting original file test/Yi5r5l8OSZs (pass -k to keep)
-*/
+/**
+ * youtube_id -> promise to download path
+ * @type {Map<string, Promise<string>>}
+ */
+const downloading = new Map();
 
-// yt-dlp -x --audio-format opus https://www.youtube.com/watch?v=Yi5r5l8OSZs -o Yi5r5l8OSZs
+/**
+ * Performs the command 
+ * ```
+ * yt-dlp -x --audio-format opus https://www.youtube.com/watch?v=Yi5r5l8OSZs -o Yi5r5l8OSZs
+ * ```
+ * and returns the path to the song.
+ *
+ * @param {string} yt_id - The yourube ID of the song to download
+ * @returns {Promise<string>} The path to the downloaded song
+ */
 function download_song(yt_id) {
-    return new Promise((resolve, err)=>{
+    // se la canzone sta già venendo scaricata per un altro motivo, usa la stessa promise
+    if (downloading.has(yt_id)) {
+        return downloading.get(yt_id);
+    }
+
+    const ret = new Promise((resolve, err)=>{
         const child = spawn("yt-dlp", [
             "-x",
             "--audio-format", 
@@ -48,7 +55,7 @@ function download_song(yt_id) {
 
         child.stdout.on('data', data=>{
             output += data.toString();
-            const m = output.toString().match(/\[ExtractAudio\] Destination: (.+)/);
+            const m = data.toString().match(/\[ExtractAudio\] Destination: (.+)/);
             if (m) {
                 location = m[1];
                 console.log("found location: "+location);
@@ -58,6 +65,7 @@ function download_song(yt_id) {
             error += data.toString();
         });
         child.on('close', code=>{
+            downloading.delete(yt_id);
             if (code==0) {
                 resolve(location);
             }else{
@@ -65,12 +73,16 @@ function download_song(yt_id) {
             }
         });
         child.on('error', e=>{
+            downloading.delete(yt_id);
             console.log("Error in song download");
             console.log(error);
             console.log(e);
-            error(e);
+            err(e);
         });
     });
+
+    downloading.set(yt_id, ret);
+    return ret;
 }
 
 /**
@@ -143,124 +155,129 @@ async function get_song(yt_id) {
 
 class Server {
     constructor(guild){
-	this.guild = guild;
-	this.queue = [];
-	this.mode = Modes.none;
-	this.radioTrack1=undefined;
-	this.radioTrack2=undefined;
-	this.isPlaying=false;
+        this.guild = guild;
+        this.queue = [];
+        this.mode = Modes.none;
+        this.radioTrack1=undefined;
+        this.radioTrack2=undefined;
+        this.isPlaying=false;
 
-	this.audioResource = undefined;
+        this.audioResource = undefined;
 
-	this.corrente = undefined;
-	this.pastSongs = [];
+        this.corrente = undefined;
+        this.pastSongs = [];
     }
     async suona(member) {
-	this.isPlaying = true;
-	let connection = Discord.getVoiceConnection(this.guild.id);
-	const canzone = this.queue.shift();
-	this.corrente = canzone;
+        this.isPlaying = true;
+        let connection = Discord.getVoiceConnection(this.guild.id);
+        const canzone = this.queue.shift();
+        this.corrente = canzone;
 
-	const song_path = await get_song(canzone.yt_id);
-	const resource = Discord.createAudioResource(song_path, {
-	    inlineVolume: true,
-	});
-	const player = Discord.createAudioPlayer({
-	    behaviors: {
-		noSubscriber: Discord.NoSubscriberBehavior.Play,
-	    }
-	});
+        const song_path = await get_song(canzone.yt_id);
+        const resource = Discord.createAudioResource(song_path, {
+            inlineVolume: true,
+        });
+        const player = Discord.createAudioPlayer({
+            behaviors: {
+                noSubscriber: Discord.NoSubscriberBehavior.Play,
+            }
+        });
 
-	// const volume = this.resource?.volume?.volume || 0.1;
-	//
-	// resource.volume?.setVolume(volume);
+        // const volume = this.resource?.volume?.volume || 0.1;
+        // resource.volume?.setVolume(volume);
 
-	this.audioPlayer = player;
-	this.audioResource = resource;
+        this.audioPlayer = player;
+        this.audioResource = resource;
 
-	if (!connection) {
-	    const channel = member.voice.channel;
-	    connection = Discord.joinVoiceChannel({
-		channelId: channel.id,
-		guildId: member.guild.id,
-		adapterCreator: member.guild.voiceAdapterCreator
-	    });
-	}
+        if (!connection) {
+            const channel = member.voice.channel;
+            connection = Discord.joinVoiceChannel({
+                channelId: channel.id,
+                guildId: member.guild.id,
+                adapterCreator: member.guild.voiceAdapterCreator
+            });
+        }
 
-	player.play(resource);
-	connection.subscribe(player);
+        player.play(resource);
+        connection.subscribe(player);
 
-	const networkStateChangeHandler = (oldNetworkState, newNetworkState) => {
-	    const newUdp = Reflect.get(newNetworkState, 'udp');
-	    clearInterval(newUdp?.keepAliveInterval);
-	}
+        const networkStateChangeHandler = (_, newNetworkState) => {
+            const newUdp = Reflect.get(newNetworkState, 'udp');
+            clearInterval(newUdp?.keepAliveInterval);
+        }
 
-	player.on('stateChange', (oldState, newState)=>{
-	    Reflect.get(oldState, 'networking')?.off('stateChange', networkStateChangeHandler);
-	    Reflect.get(newState, 'networking')?.on('stateChange', networkStateChangeHandler);
-	});
+        player.on('stateChange', (oldState, newState)=>{
+            Reflect.get(oldState, 'networking')?.off('stateChange', networkStateChangeHandler);
+            Reflect.get(newState, 'networking')?.on('stateChange', networkStateChangeHandler);
+        });
 
-	player.on(Discord.AudioPlayerStatus.Idle, ()=>{
-	    this.fine_canzone();
-	});
-	player.on('error',(err)=>{
-	    console.log("ERROR")
-	    console.log(err);
-	    this.errore_canzone();
-	});
+        player.on(Discord.AudioPlayerStatus.Idle, ()=>{
+            this.fine_canzone();
+        });
+        player.on('error',(err)=>{
+            console.log("ERROR")
+            console.log(err);
+            this.errore_canzone();
+        });
 
-	this.text_channel.send({
-	    embeds: [
-		new EmbedBuilder()
-		.setTitle("Now Playing")
-		.setColor(Colori.default)
-		.setDescription(`__[${canzone.titolo}](${canzone.link})__`)
-	    ]
-	});
+        this.text_channel.send({
+            embeds: [
+                new EmbedBuilder()
+                .setTitle("Now Playing")
+                .setColor(Colori.default)
+                .setDescription(`__[${canzone.titolo}](${canzone.link})__`)
+            ]
+        });
+
+        // experimental
+        if (this.queue.length>0) {
+            const next_song = this.queue[0];
+            get_song(next_song.yt_id);
+        }
     }
     async fine_canzone() {
-	switch (this.mode) {
-	    case Modes.none:
-	    case Modes.loopQueue:
-		this.pastSongs.push(this.corrente);
-		break;
-	    case Modes.loopQueueFromNow:
-		this.queue.push(this.corrente);
-		break;
-	    case Modes.loopSong:
-		this.queue.unshift(this.corrente);
-		break;
-	}
+        switch (this.mode) {
+            case Modes.none:
+            case Modes.loopQueue:
+                this.pastSongs.push(this.corrente);
+                break;
+            case Modes.loopQueueFromNow:
+                this.queue.push(this.corrente);
+                break;
+            case Modes.loopSong:
+                this.queue.unshift(this.corrente);
+                break;
+        }
 
-	this.audioPlayer?.removeAllListeners();
-	this.audioPlayer?.stop(true);
-	this.audioResource=null;
+        this.audioPlayer?.removeAllListeners();
+        this.audioPlayer?.stop(true);
+        this.audioResource=null;
 
-	// se il bot è in un canale e ci sono ancora canzoni incoda suonale
-	const connection = Discord.getVoiceConnection(this.guild.id);
-	if (connection) {
-	    const voiceChannelId = connection.joinConfig.channelId;
-	    const voiceChannel = await this.guild.channels.fetch(voiceChannelId);
+        // se il bot è in un canale e ci sono ancora canzoni incoda suonale
+        const connection = Discord.getVoiceConnection(this.guild.id);
+        if (connection) {
+            const voiceChannelId = connection.joinConfig.channelId;
+            const voiceChannel = await this.guild.channels.fetch(voiceChannelId);
 
-	    if (this.queue.length>0 && voiceChannel.members.size>1) {
-		this.suona();
-		return;
-	    }
-	}
+            if (this.queue.length>0 && voiceChannel.members.size>1) {
+                this.suona();
+                return;
+            }
+        }
 
-	// lascia il canale
-	console.log("leaving channel");
-	connection?.disconnect();
-	connection?.destroy();
-	this.isPlaying=false;
-	this.audioResource = undefined;
-	this.pastSongs.push(...this.queue);
-	this.mode = Modes.none;
+        // lascia il canale
+        console.log("leaving channel");
+        connection?.disconnect();
+        connection?.destroy();
+        this.isPlaying=false;
+        this.audioResource = undefined;
+        this.pastSongs.push(...this.queue);
+        this.mode = Modes.none;
 
-	servers.delete(this.guild.id);
+        servers.delete(this.guild.id);
     }
     errore_canzone() {
-	this.fine_canzone();
+        this.fine_canzone();
     }
 }
 
