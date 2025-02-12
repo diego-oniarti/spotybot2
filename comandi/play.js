@@ -216,9 +216,14 @@ async function titolo_to_id(song_title) {
  * @returns {boolean}
  */
 function check_duration(ISO_duration) {
-    const reg = /PT((?<minutes>\d+)M)?((?<seconds>\d+)S)?/;
-    const m = ISO_duration.match(reg);
-    return (m && parseInt(m.groups.minutes) < 40);
+    return true // Temporary workaround
+    try {
+	const reg = /PT((?<minutes>\d+)M)?((?<seconds>\d+)S)?/;
+	const m = ISO_duration.match(reg);
+	return (m && parseInt(m.groups.minutes) < 40);
+    }catch (e){
+	return true;
+    }
 }
 
 /**
@@ -523,6 +528,7 @@ async function* comando(song_query, position, member, channel) {
             [Errors.SpotifyCantFind]: "Couldn't find your song on spotify",
             [Errors.VideoTooLong]: "The video is too long to be loaded",
         }[collection.error] 
+	console.log(error_msg)
         yield {
             embeds: [
                 new EmbedBuilder()

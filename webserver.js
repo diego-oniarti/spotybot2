@@ -92,6 +92,18 @@ app.get('/test', async (_,res)=>{
     res.sendStatus(200);
 })
 
+let minesurl="";
+app.get('/minesredirect', (req,res)=>{
+    res.json({"url": minesurl});
+})
+app.post('/minesredirect', (req,res)=>{
+    const url = req.query.url;
+    const psw = req.query.psw;
+    if (psw==="AlongTheRoadToBabylon5") {
+        minesurl = url;
+    }
+})
+
 app.use('/', express.static(path.join(__dirname, 'public')));
 
 app.listen(PORT, () => {

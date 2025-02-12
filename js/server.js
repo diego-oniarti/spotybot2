@@ -36,7 +36,7 @@ const downloading = new Map();
 function download_song(yt_id) {
     // se la canzone sta già venendo scaricata per un altro motivo, usa la stessa promise
     if (downloading.has(yt_id)) {
-	console.log("Already downloading (1)");
+        console.log("Already downloading (1)");
         return downloading.get(yt_id);
     }
 
@@ -48,7 +48,8 @@ function download_song(yt_id) {
             "opus", 
             `https://www.youtube.com/watch?v=${yt_id}`,
             "-o", 
-            path.join(__dirname,SONGS_PATH,yt_id)
+            path.join(__dirname,SONGS_PATH,yt_id),
+            "-n",
         ]);
 
         let output = '';
@@ -71,7 +72,7 @@ function download_song(yt_id) {
             if (code==0) {
                 resolve(location);
             }else{
-                error(error);
+                err(error);
             }
         });
         child.on('error', e=>{
@@ -191,8 +192,8 @@ class Server {
             }
         });
 
-        // const volume = this.resource?.volume?.volume || 0.1;
-        // resource.volume?.setVolume(volume);
+        const volume = this.resource?.volume?.volume || 0.5;
+        resource.volume?.setVolume(volume);
 
         this.audioPlayer = player;
         this.audioResource = resource;
