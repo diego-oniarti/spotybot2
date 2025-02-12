@@ -2,7 +2,6 @@ require('dotenv').config();
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const Comando = require('../js/comando');
 const { Colori } = require('../js/colori');
-const fetch = require('node-fetch');
 const { servers, db_ref, save_db } = require('../shared');
 const { Server } = require('../js/server');
 const querystring = require('node:querystring');
