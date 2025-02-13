@@ -3,7 +3,8 @@ const { EmbedBuilder } = require('discord.js');
 const { Colori } = require('./colori');
 const { servers } = require('../shared');
 require("dotenv").config();
-const { PassThrough } = require('stream')
+const { PassThrough, Transform } = require('stream');
+const axios = require('axios');
 
 const Modes = {
     none: 1,
@@ -12,6 +13,17 @@ const Modes = {
     radio: 4,
     loopQueueFromNow: 5
 }
+
+const stream_url = 'https://ice04.fluidstream.net/ria60_ca.mp3';
+const pt = new PassThrough();
+axios({
+    method: 'get',
+    url: stream_url,
+    responseType: 'stream'
+})
+    .then(response=>{
+        response.data.pipe(pt);
+    })
 
 class Server {
     constructor(guild){
@@ -40,13 +52,20 @@ class Server {
             }
         });
 
-        const stream_url = 'https://sr10.inmystream.it/proxy/lattedab?mp=/dab';
+        const transformStream = new Transform({
+            transform(chunk, encoding, callback) {
+                this.push(chunk);
+                callback();
+            }
+        });
+        pt.pipe(transformStream);
 
-        const resource = Discord.createAudioResource(stream_url);
+        const resource = Discord.createAudioResource(transformStream);
         player.play(resource);
 
         this.audioPlayer = player;
         this.audioResource = resource;
+        this.transformStream = transformStream
 
         if (!connection) {
             const channel = member.voice.channel;
@@ -59,9 +78,9 @@ class Server {
 
         connection.subscribe(player);
 
-        player.on(Discord.AudioPlayerStatus.Idle, ()=>{
-            this.fine_canzone();
-        });
+        // player.on(Discord.AudioPlayerStatus.Idle, ()=>{
+        //     this.fine_canzone();
+        // });
 
         player.on('error',(err)=>{
             console.log("ERROR")
@@ -127,5 +146,6 @@ class Server {
 
 module.exports = {
     Server: Server, 
-    Modes: Modes
+    Modes: Modes,
+    PT: pt
 };
