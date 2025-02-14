@@ -14,24 +14,11 @@ const Modes = {
     loopQueueFromNow: 5
 }
 
-const stream_url = 'https://ice04.fluidstream.net/ria60_ca.mp3';
-const pt = new PassThrough();
-axios({
-    method: 'get',
-    url: stream_url,
-    responseType: 'stream'
-})
-    .then(response=>{
-        response.data.pipe(pt);
-    })
-
 class Server {
     constructor(guild){
         this.guild = guild;
         this.queue = [];
         this.mode = Modes.none;
-        this.radioTrack1=undefined;
-        this.radioTrack2=undefined;
         this.isPlaying=false;
 
         this.audioResource = undefined;
@@ -40,11 +27,9 @@ class Server {
         this.pastSongs = [];
     }
 
-    async suona(member) {
+    async suona(radio_id, member) {
         this.isPlaying = true;
         let connection = Discord.getVoiceConnection(this.guild.id);
-        const canzone = this.queue.shift();
-        this.corrente = canzone;
 
         const player = Discord.createAudioPlayer({
             behaviors: {
@@ -52,20 +37,11 @@ class Server {
             }
         });
 
-        const transformStream = new Transform({
-            transform(chunk, encoding, callback) {
-                this.push(chunk);
-                callback();
-            }
-        });
-        pt.pipe(transformStream);
-
-        const resource = Discord.createAudioResource(transformStream);
+        const resource = Discord.createAudioResource(`http://radio.garden/api/ara/content/listen/${radio_id}/channel.mp3`);
         player.play(resource);
 
         this.audioPlayer = player;
         this.audioResource = resource;
-        this.transformStream = transformStream
 
         if (!connection) {
             const channel = member.voice.channel;
@@ -78,27 +54,19 @@ class Server {
 
         connection.subscribe(player);
 
-        // player.on(Discord.AudioPlayerStatus.Idle, ()=>{
-        //     this.fine_canzone();
-        // });
+        player.on(Discord.AudioPlayerStatus.Idle, ()=>{
+            this.leave()
+        });
 
         player.on('error',(err)=>{
             console.log("ERROR")
             console.log(err);
             this.errore_canzone();
         });
-
-        this.text_channel.send({
-            embeds: [
-                new EmbedBuilder()
-                .setTitle("Now Playing")
-                .setColor(Colori.default)
-                .setDescription(`Radio`)
-            ]
-        });
     }
 
     async fine_canzone() {
+        return;
         switch (this.mode) {
             case Modes.none:
             case Modes.loopQueue:
@@ -139,13 +107,20 @@ class Server {
 
         servers.delete(this.guild.id);
     }
+
+    leave() {
+        this.audioPlayer?.stop();
+        const connection = Discord.getVoiceConnection(this.guild.id);
+        if (connection) connection.destroy();
+        servers.delete(this.guild.id);
+    }
+
     errore_canzone() {
-        this.fine_canzone();
+        this.leave();
     }
 }
 
 module.exports = {
     Server: Server, 
     Modes: Modes,
-    PT: pt
 };

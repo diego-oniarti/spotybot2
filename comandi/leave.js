@@ -4,6 +4,7 @@ const Comando = require('../js/comando');
 const requisiti = require('../js/requisiti');
 const { servers } = require('../shared');
 const Discord = require('@discordjs/voice');
+const { PT } = require('../js/server');
 
 const comando = async (member)=>{
     const playingError = requisiti.playing(member.guild);
@@ -15,12 +16,9 @@ const comando = async (member)=>{
         return sameVCError;
 
     const guild = member.guild;
-    const connection = Discord.getVoiceConnection(guild.id);
 
-    if (connection)
-        connection.destroy();
-    
-    servers.delete(guild.id);
+    const server = servers.get(guild.id);
+    server.leave();
 
     return {
         embeds: [ new EmbedBuilder()

@@ -616,6 +616,16 @@ module.exports = {
             const song = interaction.options.getString("song").trim();
             const position = interaction.options.getInteger("position")-1;
 
+            interaction.reply({
+                embeds: [
+                    new EmbedBuilder()
+                    .setTitle('This command doesn\'t work right now')
+                    .setDescription('Try again in a month or so. Use /radio instead for now')
+                    .setColor(Colori.default)
+                ]
+            });
+            return;
+
             await interaction.deferReply({ephemeral:false});
 
             let old_message_resolved = true;
@@ -642,6 +652,16 @@ module.exports = {
 
         aliases: ['play', 'p'],
         executeMsg: async (message,args)=>{
+            message.channel.send({
+                embeds: [
+                    new EmbedBuilder()
+                    .setTitle('This command doesn\'t work right now')
+                    .setDescription('Try again in a month or so. Use /radio instead for now')
+                    .setColor(Colori.default)
+                ]
+            });
+            return;
+
             const canzone = args.join(' ');
 
             if (!canzone)
